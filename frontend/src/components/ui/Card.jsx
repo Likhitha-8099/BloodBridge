@@ -1,0 +1,12 @@
+import React from 'react';
+
+/**
+ * Reusable Card container component.
+ */
+export default function Card({ children, className = '' }) {
+  return (
+    <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-6 ${className}`}>
+      {children}
+    </div>
+  );
+}

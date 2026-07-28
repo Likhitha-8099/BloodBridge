@@ -1,0 +1,10 @@
+com\bloodbridge\service\EmailServiceImplTest.class
+com\bloodbridge\service\HospitalServiceImplTest.class
+com\bloodbridge\service\AuthServiceImplTest.class
+com\bloodbridge\service\MatchingServiceImplTest.class
+com\bloodbridge\service\DonorProfileServiceImplTest.class
+com\bloodbridge\service\BloodRequestServiceImplTest.class
+com\bloodbridge\service\DashboardServiceImplTest.class
+com\bloodbridge\service\DonationServiceImplTest.class
+com\bloodbridge\service\PatientProfileServiceImplTest.class
+com\bloodbridge\service\NotificationServiceImplTest.class
