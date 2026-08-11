@@ -115,4 +115,12 @@ public interface DonationService {
      * @param donationDate the date of donation
      */
     void updateDonorStatistics(DonorProfile donor, LocalDate donationDate);
+
+    /**
+     * Fetches donation summaries for the currently authenticated donor.
+     *
+     * @param userEmail the authenticated donor's email
+     * @return list of donation summaries
+     */
+    List<DonationSummaryResponse> getMyDonations(String userEmail);
 }

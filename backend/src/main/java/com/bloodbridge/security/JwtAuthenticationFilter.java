@@ -62,9 +62,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            // Log authentication errors if necessary, but allow request to continue,
-            // resulting in 403/401 standard security responses for protected endpoints.
-            logger.error("Could not set user authentication in security context", e);
+            // Token is invalid, expired, or user was not found (e.g., email changed).
+            // Do not set SecurityContext, allowing JwtAuthenticationEntryPoint to return 401 Unauthorized.
+            logger.warn(String.format("JWT authentication failed for request URI %s: %s", request.getRequestURI(), e.getMessage()));
         }
 
         filterChain.doFilter(request, response);

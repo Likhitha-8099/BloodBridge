@@ -70,8 +70,8 @@ public interface HospitalRepository extends JpaRepository<Hospital, Long> {
      */
     @org.springframework.data.jpa.repository.Query("SELECT h.hospitalName, " +
            "(SELECT COUNT(r) FROM BloodRequest r WHERE r.hospital.id = h.id), " +
-           "(SELECT COUNT(d) FROM Donation d WHERE d.hospital.id = h.id AND d.status = 'COMPLETED') as donationCount " +
+           "(SELECT COUNT(d) FROM Donation d WHERE d.hospital.id = h.id AND d.status = com.bloodbridge.enums.DonationStatus.COMPLETED) " +
            "FROM Hospital h " +
-           "ORDER BY donationCount DESC")
+           "ORDER BY (SELECT COUNT(d) FROM Donation d WHERE d.hospital.id = h.id AND d.status = com.bloodbridge.enums.DonationStatus.COMPLETED) DESC")
     List<Object[]> findTopHospitals(org.springframework.data.domain.Pageable pageable);
 }

@@ -18,12 +18,15 @@ import lombok.ToString;
 @AllArgsConstructor
 @Builder
 @ToString(exclude = "password")
+@io.swagger.v3.oas.annotations.media.Schema(description = "User Login Request Payload")
 public class LoginRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Registered email address", example = "john.doe@example.com")
     private String email;
 
     @NotBlank(message = "Password is required")
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Account password", example = "BloodBridge@2026")
     private String password;
 }

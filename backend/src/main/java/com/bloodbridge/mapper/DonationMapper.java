@@ -34,6 +34,19 @@ public class DonationMapper {
 
         Hospital hospital = donation.getHospital();
 
+        com.bloodbridge.enums.BloodGroup bloodGroup = null;
+        if (donor != null && donor.getBloodGroup() != null) {
+            bloodGroup = donor.getBloodGroup();
+        } else if (donation.getBloodRequest() != null) {
+            bloodGroup = donation.getBloodRequest().getBloodGroupNeeded();
+        }
+
+        boolean certAvail = donation.getStatus() == com.bloodbridge.enums.DonationStatus.COMPLETED;
+        String certId = donation.getCertificateId();
+        if (certAvail && (certId == null || certId.isBlank())) {
+            certId = "CERT-BB-" + (donation.getDonationDate() != null ? donation.getDonationDate().getYear() : 2026) + "-" + String.format("%06d", donation.getId());
+        }
+
         return DonationResponse.builder()
                 .id(donation.getId())
                 .donorId(donor != null ? donor.getId() : null)
@@ -47,7 +60,11 @@ public class DonationMapper {
                 .donationDate(donation.getDonationDate())
                 .unitsDonated(donation.getUnitsDonated())
                 .remarks(donation.getRemarks())
+                .bloodGroup(bloodGroup)
+                .certificateId(certId)
+                .certificateAvailable(certAvail)
                 .status(donation.getStatus())
+                .completedAt(donation.getCompletedAt())
                 .createdAt(donation.getCreatedAt())
                 .updatedAt(donation.getUpdatedAt())
                 .build();
@@ -72,14 +89,30 @@ public class DonationMapper {
 
         Hospital hospital = donation.getHospital();
 
+        com.bloodbridge.enums.BloodGroup bloodGroup = null;
+        if (donor != null && donor.getBloodGroup() != null) {
+            bloodGroup = donor.getBloodGroup();
+        } else if (donation.getBloodRequest() != null) {
+            bloodGroup = donation.getBloodRequest().getBloodGroupNeeded();
+        }
+
+        boolean certAvail = donation.getStatus() == com.bloodbridge.enums.DonationStatus.COMPLETED;
+        String certId = donation.getCertificateId();
+        if (certAvail && (certId == null || certId.isBlank())) {
+            certId = "CERT-BB-" + (donation.getDonationDate() != null ? donation.getDonationDate().getYear() : 2026) + "-" + String.format("%06d", donation.getId());
+        }
+
         return DonationSummaryResponse.builder()
                 .id(donation.getId())
                 .donorName(donorUser != null ? donorUser.getFullName() : null)
                 .patientName(patientUser != null ? patientUser.getFullName() : null)
                 .hospitalName(hospital != null ? hospital.getHospitalName() : null)
+                .bloodGroup(bloodGroup)
                 .donationDate(donation.getDonationDate())
                 .unitsDonated(donation.getUnitsDonated())
                 .status(donation.getStatus())
+                .certificateId(certId)
+                .certificateAvailable(certAvail)
                 .build();
     }
 }

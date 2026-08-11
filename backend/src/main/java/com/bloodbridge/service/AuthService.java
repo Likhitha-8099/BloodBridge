@@ -1,37 +1,45 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.ApiResponse;
-import com.bloodbridge.dto.AuthResponse;
-import com.bloodbridge.dto.LoginRequest;
-import com.bloodbridge.dto.RegisterRequest;
+import com.bloodbridge.dto.request.LoginRequest;
+import com.bloodbridge.dto.request.RegisterRequest;
+import com.bloodbridge.dto.response.ApiResponse;
+import com.bloodbridge.dto.response.AuthResponse;
 
 /**
- * Service interface defining authentication workflows (register and login).
+ * Service interface defining authentication workflows (register, login, me).
  */
 public interface AuthService {
 
     /**
      * Registers a new user.
      *
-     * @param request the registration request details
+     * @param request the registration request payload
      * @return an {@link ApiResponse} confirming registration
      */
-    ApiResponse register(RegisterRequest request);
+    ApiResponse<String> register(RegisterRequest request);
 
     /**
      * Authenticates a user and generates a JWT.
      *
-     * @param request the login credentials
-     * @return an {@link AuthResponse} containing the generated token and user details
+     * @param request the login credentials payload
+     * @return an {@link ApiResponse} containing the generated token and user details
      */
-    AuthResponse login(LoginRequest request);
+    ApiResponse<AuthResponse> login(LoginRequest request);
 
     /**
-     * Switches the active role for a user and generates a new JWT.
+     * Retrieves the user information for the currently authenticated user.
      *
-     * @param email the user email
-     * @param newRole the new role to activate
-     * @return an {@link AuthResponse} containing the new token and updated user details
+     * @param email user email address
+     * @return {@link ApiResponse} containing {@link AuthResponse.UserInfo} details
      */
-    AuthResponse switchRole(String email, com.bloodbridge.enums.Role newRole);
+    ApiResponse<AuthResponse.UserInfo> getCurrentUser(String email);
+
+    /**
+     * Switches active role for a multi-role or single-role user session.
+     *
+     * @param email user email address
+     * @param targetRole target role name
+     * @return {@link ApiResponse} containing updated {@link AuthResponse}
+     */
+    ApiResponse<AuthResponse> switchRole(String email, String targetRole);
 }

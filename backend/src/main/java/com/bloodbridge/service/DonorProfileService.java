@@ -1,95 +1,105 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.ApiResponse;
-import com.bloodbridge.dto.AvailabilityUpdateRequest;
-import com.bloodbridge.dto.DonorProfileRequest;
-import com.bloodbridge.dto.DonorProfileResponse;
-import com.bloodbridge.dto.DonorSearchResponse;
-import com.bloodbridge.entity.DonorProfile;
-import com.bloodbridge.enums.BloodGroup;
+import com.bloodbridge.dto.request.AvailabilityRequest;
+import com.bloodbridge.dto.request.CreateDonorProfileRequest;
+import com.bloodbridge.dto.request.EmergencyAvailabilityRequest;
+import com.bloodbridge.dto.request.PreferredRadiusRequest;
+import com.bloodbridge.dto.request.UpdateDonorProfileRequest;
+import com.bloodbridge.dto.response.ApiResponse;
+import com.bloodbridge.dto.response.DonationHistoryResponse;
+import com.bloodbridge.dto.response.DonorDashboardResponse;
+import com.bloodbridge.dto.response.DonorProfileResponse;
+import com.bloodbridge.dto.response.EligibilityResponse;
 
-import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Service interface defining workflows for managing donor profiles and searches.
+ * Service interface for Donor Management & Smart Donor Portal workflows.
  */
 public interface DonorProfileService {
 
     /**
-     * Creates a new donor profile for the currently authenticated user.
+     * Creates a new donor profile for an authenticated user with role DONOR.
      *
-     * @param request the profile details
-     * @return the created profile response
+     * @param email authenticated user email
+     * @param request profile creation request
+     * @return ApiResponse containing DonorProfileResponse
      */
-    DonorProfileResponse createProfile(DonorProfileRequest request);
+    ApiResponse<DonorProfileResponse> createProfile(String email, CreateDonorProfileRequest request);
 
     /**
-     * Retrieves the profile of the currently authenticated donor.
+     * Retrieves current donor profile.
      *
-     * @return the donor's profile details
+     * @param email authenticated user email
+     * @return ApiResponse containing DonorProfileResponse
      */
-    DonorProfileResponse getMyProfile();
+    ApiResponse<DonorProfileResponse> getMyProfile(String email);
 
     /**
-     * Updates the profile of the currently authenticated donor.
+     * Updates current donor profile details.
      *
-     * @param request the updated details
-     * @return the updated profile response
+     * @param email authenticated user email
+     * @param request profile update request
+     * @return ApiResponse containing updated DonorProfileResponse
      */
-    DonorProfileResponse updateProfile(DonorProfileRequest request);
+    ApiResponse<DonorProfileResponse> updateProfile(String email, UpdateDonorProfileRequest request);
 
     /**
-     * Deletes the profile of the currently authenticated donor.
+     * Toggles availability status for regular blood donation.
      *
-     * @return an {@link ApiResponse} confirming deletion status
+     * @param email authenticated user email
+     * @param request availability payload
+     * @return ApiResponse containing updated DonorProfileResponse
      */
-    ApiResponse deleteProfile();
+    ApiResponse<DonorProfileResponse> toggleAvailability(String email, AvailabilityRequest request);
 
     /**
-     * Updates the availability status of the currently authenticated donor.
+     * Updates emergency availability status for urgent blood calls.
      *
-     * @param request the availability payload
-     * @return the updated profile response
+     * @param email authenticated user email
+     * @param request emergency availability payload
+     * @return ApiResponse containing updated DonorProfileResponse
      */
-    DonorProfileResponse updateAvailability(AvailabilityUpdateRequest request);
+    ApiResponse<DonorProfileResponse> updateEmergencyAvailability(String email, EmergencyAvailabilityRequest request);
 
     /**
-     * Searches for donors matching a specific blood group.
+     * Updates preferred donation distance radius.
      *
-     * @param bloodGroup the blood group to search for
-     * @return a list of matching search responses
+     * @param email authenticated user email
+     * @param request preferred radius payload
+     * @return ApiResponse containing updated DonorProfileResponse
      */
-    List<DonorSearchResponse> searchByBloodGroup(BloodGroup bloodGroup);
+    ApiResponse<DonorProfileResponse> updatePreferredRadius(String email, PreferredRadiusRequest request);
 
     /**
-     * Searches for donors located in a specific city.
+     * Retrieves Smart Donor Dashboard metrics summary.
      *
-     * @param city the city name
-     * @return a list of matching search responses
+     * @param email authenticated user email
+     * @return ApiResponse containing DonorDashboardResponse
      */
-    List<DonorSearchResponse> searchByCity(String city);
+    ApiResponse<DonorDashboardResponse> getDashboard(String email);
 
     /**
-     * Retrieves all donors who are marked as available for donation.
+     * Calculates smart donor eligibility details, next eligible date, and health recommendations.
      *
-     * @return a list of available search responses
+     * @param email authenticated user email
+     * @return ApiResponse containing EligibilityResponse
      */
-    List<DonorSearchResponse> getAvailableDonors();
+    ApiResponse<EligibilityResponse> calculateEligibility(String email);
 
     /**
-     * Checks if the donor is clinically eligible to donate based on their profile data.
+     * Retrieves donation history timeline for current donor.
      *
-     * @param profile the donor's profile
-     * @return true if the donor is eligible, false otherwise
+     * @param email authenticated user email
+     * @return ApiResponse containing list of DonationHistoryResponse items
      */
-    boolean isEligibleForDonation(DonorProfile profile);
+    ApiResponse<List<DonationHistoryResponse>> getDonationHistory(String email);
 
     /**
-     * Calculates the next date on which the donor is eligible to donate.
+     * Soft deletes (deactivates) donor profile.
      *
-     * @param profile the donor's profile
-     * @return the next eligible donation date
+     * @param email authenticated user email
+     * @return ApiResponse confirming profile deletion
      */
-    LocalDate calculateNextEligibleDate(DonorProfile profile);
+    ApiResponse<String> deleteProfile(String email);
 }

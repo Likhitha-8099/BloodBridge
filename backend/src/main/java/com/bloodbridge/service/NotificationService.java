@@ -1,87 +1,58 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.NotificationCreateRequest;
-import com.bloodbridge.dto.NotificationResponse;
-import com.bloodbridge.dto.NotificationStatisticsResponse;
-import com.bloodbridge.dto.NotificationSummaryResponse;
-import com.bloodbridge.entity.Notification;
+import com.bloodbridge.dto.request.BroadcastAnnouncementRequest;
+import com.bloodbridge.dto.request.SendNotificationRequest;
+import com.bloodbridge.dto.response.ApiResponse;
+import com.bloodbridge.dto.response.NotificationCountResponse;
+import com.bloodbridge.dto.response.NotificationResponse;
+import com.bloodbridge.entity.BloodRequest;
+import com.bloodbridge.entity.DonorProfile;
+import com.bloodbridge.entity.Hospital;
 import com.bloodbridge.entity.User;
+import com.bloodbridge.enums.DeliveryChannel;
 import com.bloodbridge.enums.NotificationType;
 
 import java.util.List;
+import java.util.Map;
 
 /**
- * Service interface defining workflows for managing notifications.
+ * Centralized service interface for Automated Notification, Alert & Communication System.
  */
 public interface NotificationService {
 
-    /**
-     * Creates and stores an in-app notification record.
-     *
-     * @param request the notification creation details
-     * @return the created notification details
-     */
-    NotificationResponse createNotification(NotificationCreateRequest request);
+    ApiResponse<NotificationResponse> sendNotification(SendNotificationRequest request);
 
-    /**
-     * Sends/processes an existing notification (e.g. queues or delivers mail).
-     *
-     * @param id the notification ID
-     * @return the updated notification details
-     */
-    NotificationResponse sendNotification(Long id);
+    ApiResponse<NotificationResponse> markAsRead(String email, Long id);
 
-    /**
-     * Marks a specific notification as read.
-     *
-     * @param id the notification ID
-     * @return the updated notification details
-     */
-    NotificationResponse markAsRead(Long id);
+    ApiResponse<String> markAllAsRead(String email);
 
-    /**
-     * Retrieves all notifications sent to the currently authenticated user.
-     *
-     * @return a list of notification summaries
-     */
-    List<NotificationSummaryResponse> getMyNotifications();
+    ApiResponse<List<NotificationResponse>> getMyNotifications(String email);
 
-    /**
-     * Retrieves unread notifications sent to the currently authenticated user.
-     *
-     * @return a list of unread notification summaries
-     */
-    List<NotificationSummaryResponse> getUnreadNotifications();
+    ApiResponse<Map<String, Object>> getNotificationsPaginated(String email, Integer page, Integer size, String category, String priority, Boolean read, Long cursor);
 
-    /**
-     * Retrieves a notification by its ID. Restricted to recipient user or ADMIN.
-     *
-     * @param id the notification ID
-     * @return detailed notification response
-     */
-    NotificationResponse getNotificationById(Long id);
+    ApiResponse<List<NotificationResponse>> getUnreadNotifications(String email);
 
-    /**
-     * Dispatches the notification via email and updates status in the database.
-     *
-     * @param notification the notification entity
-     */
-    void sendEmailNotification(Notification notification);
+    ApiResponse<NotificationCountResponse> getNotificationCount(String email);
 
-    /**
-     * High-level entry point to create both an In-App notification and dispatch an Email alert.
-     *
-     * @param recipient the recipient user entity
-     * @param title     the title
-     * @param message   the notification body message
-     * @param type      the notification type enum
-     */
+    ApiResponse<Map<String, Object>> getUnreadBadgeCount(String email);
+
+    ApiResponse<String> deleteNotification(String email, Long id);
+
+    ApiResponse<String> broadcastAnnouncement(String adminEmail, BroadcastAnnouncementRequest request);
+
+    void retryFailedNotifications();
+
+    void triggerNotificationEvent(User recipient, String title, String message, NotificationType type, DeliveryChannel channel, String priority);
+
     void triggerNotificationEvent(User recipient, String title, String message, NotificationType type);
 
-    /**
-     * Retrieves overall aggregate notification metrics.
-     *
-     * @return stats details
-     */
-    NotificationStatisticsResponse getNotificationStatistics();
+    void createDonorAcceptedNotification(DonorProfile donor, Hospital hospital, BloodRequest request);
+
+    ApiResponse<List<NotificationResponse>> getHospitalNotifications(String email);
+
+    void notifyHospital(Hospital hospital, String title, String message, NotificationType type, String actionUrl, BloodRequest bloodRequest, DonorProfile donor);
+    void notifyDonor(DonorProfile donor, String title, String message, NotificationType type, String actionUrl, BloodRequest bloodRequest, Hospital hospital);
+    void notifyPatient(User patientUser, String title, String message, NotificationType type, String actionUrl, BloodRequest bloodRequest);
+    void notifyAdmin(String title, String message, NotificationType type, String actionUrl);
+    void notifyNearbyCompatibleDonors(BloodRequest request);
 }

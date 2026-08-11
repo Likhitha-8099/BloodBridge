@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 
 /**
  * Entity representing a patient profile in the Blood Bridge system.
- * Connects users to patient information, medical histories, and emergency contacts.
  */
 @Entity
 @Table(name = "patient_profiles")
@@ -26,7 +25,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = "user")
+@ToString(exclude = {"user", "hospital"})
 public class PatientProfile {
 
     @Id
@@ -37,6 +36,9 @@ public class PatientProfile {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     @NotNull(message = "User reference is required")
     private User user;
+
+    @Column(name = "patient_code")
+    private String patientCode;
 
     @Column(name = "age", nullable = false)
     @NotNull(message = "Age is required")
@@ -54,6 +56,36 @@ public class PatientProfile {
     @NotNull(message = "Blood group is required")
     private BloodGroup bloodGroup;
 
+    @Column(name = "rh_factor")
+    private String rhFactor;
+
+    @Column(name = "weight")
+    private Double weight;
+
+    @Column(name = "medical_condition", length = 1000)
+    private String medicalCondition;
+
+    @Column(name = "diagnosis", length = 1000)
+    private String diagnosis;
+
+    @Column(name = "doctor_name")
+    private String doctorName;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hospital_id")
+    private Hospital hospital;
+
+    @NotBlank(message = "Emergency contact name is required")
+    @Column(name = "emergency_contact_name", nullable = false)
+    private String emergencyContactName;
+
+    @NotBlank(message = "Emergency contact number is required")
+    @Column(name = "emergency_contact_number", nullable = false)
+    private String emergencyContactNumber;
+
+    @Column(name = "relationship")
+    private String relationship;
+
     @Column(name = "address")
     private String address;
 
@@ -65,16 +97,27 @@ public class PatientProfile {
     @Column(name = "state", nullable = false)
     private String state;
 
-    @NotBlank(message = "Emergency contact name is required")
-    @Column(name = "emergency_contact_name", nullable = false)
-    private String emergencyContactName;
+    @Column(name = "country")
+    private String country;
 
-    @NotBlank(message = "Emergency contact number is required")
-    @Column(name = "emergency_contact_number", nullable = false)
-    private String emergencyContactNumber;
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "preferred_hospital")
+    private String preferredHospital;
 
     @Column(name = "medical_history", length = 2000)
     private String medicalHistory;
+
+    @Builder.Default
+    @Column(name = "status", nullable = false)
+    private String status = "ACTIVE";
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

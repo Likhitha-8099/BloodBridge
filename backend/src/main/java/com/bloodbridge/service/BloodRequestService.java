@@ -1,7 +1,7 @@
 package com.bloodbridge.service;
 
 import com.bloodbridge.dto.BloodRequestCreateRequest;
-import com.bloodbridge.dto.BloodRequestResponse;
+import com.bloodbridge.dto.response.BloodRequestResponse;
 import com.bloodbridge.dto.BloodRequestSummaryResponse;
 import com.bloodbridge.dto.BloodRequestUpdateRequest;
 import com.bloodbridge.dto.RequestStatusResponse;
@@ -101,4 +101,36 @@ public interface BloodRequestService {
      * @return a list of active request summaries
      */
     List<BloodRequestSummaryResponse> getActiveRequests();
+
+    /**
+     * Retrieves emergency requests matching authenticated donor's blood group, city, and state.
+     * Sorted highest urgency first, then latest request.
+     */
+    List<BloodRequestSummaryResponse> getEmergencyRequestsForDonor();
+
+    /**
+     * Retrieves matched emergency blood requests assigned to the logged-in donor by the Smart Donor Matching Engine.
+     */
+    List<com.bloodbridge.dto.response.DonorEmergencyRequestDTO> getMatchedEmergencyRequestsForDonor();
+
+    /**
+     * Accepts a blood request by ID for authenticated donor.
+     * Prevents duplicate acceptances and notifies the hospital.
+     */
+    BloodRequestSummaryResponse acceptBloodRequest(Long id);
+
+    /**
+     * Accepts a matched emergency blood request by ID for authenticated donor.
+     */
+    com.bloodbridge.dto.response.DonorEmergencyRequestDTO acceptMatchedEmergencyRequest(Long bloodRequestId);
+
+    /**
+     * Rejects/declines a blood request by ID for authenticated donor.
+     */
+    BloodRequestSummaryResponse rejectBloodRequest(Long id);
+
+    /**
+     * Rejects/declines a matched emergency blood request by ID for authenticated donor.
+     */
+    com.bloodbridge.dto.response.DonorEmergencyRequestDTO rejectMatchedEmergencyRequest(Long bloodRequestId);
 }

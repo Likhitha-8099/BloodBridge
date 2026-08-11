@@ -41,6 +41,34 @@ public class CompatibilityService {
     }
 
     /**
+     * Retrieves the list of compatible recipient blood groups that a donor with donorGroup can donate to.
+     *
+     * @param donorGroup the donor's blood group
+     * @return list of compatible recipient blood groups
+     */
+    public List<BloodGroup> getRecipientBloodGroupsForDonor(BloodGroup donorGroup) {
+        if (donorGroup == null) {
+            return Collections.emptyList();
+        }
+
+        return switch (donorGroup) {
+            case O_NEGATIVE -> List.of(
+                    BloodGroup.O_NEGATIVE, BloodGroup.O_POSITIVE,
+                    BloodGroup.A_NEGATIVE, BloodGroup.A_POSITIVE,
+                    BloodGroup.B_NEGATIVE, BloodGroup.B_POSITIVE,
+                    BloodGroup.AB_NEGATIVE, BloodGroup.AB_POSITIVE
+            );
+            case O_POSITIVE -> List.of(BloodGroup.O_POSITIVE, BloodGroup.A_POSITIVE, BloodGroup.B_POSITIVE, BloodGroup.AB_POSITIVE);
+            case A_NEGATIVE -> List.of(BloodGroup.A_NEGATIVE, BloodGroup.A_POSITIVE, BloodGroup.AB_NEGATIVE, BloodGroup.AB_POSITIVE);
+            case A_POSITIVE -> List.of(BloodGroup.A_POSITIVE, BloodGroup.AB_POSITIVE);
+            case B_NEGATIVE -> List.of(BloodGroup.B_NEGATIVE, BloodGroup.B_POSITIVE, BloodGroup.AB_NEGATIVE, BloodGroup.AB_POSITIVE);
+            case B_POSITIVE -> List.of(BloodGroup.B_POSITIVE, BloodGroup.AB_POSITIVE);
+            case AB_NEGATIVE -> List.of(BloodGroup.AB_NEGATIVE, BloodGroup.AB_POSITIVE);
+            case AB_POSITIVE -> List.of(BloodGroup.AB_POSITIVE);
+        };
+    }
+
+    /**
      * Checks if a donor's blood group is compatible with a recipient's blood group.
      *
      * @param donorGroup     the donor's blood group

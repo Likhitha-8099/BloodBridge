@@ -32,7 +32,11 @@ public class DonationResponse {
     private LocalDate donationDate;
     private Integer unitsDonated;
     private String remarks;
+    private com.bloodbridge.enums.BloodGroup bloodGroup;
+    private String certificateId;
+    private Boolean certificateAvailable;
     private DonationStatus status;
+    private LocalDateTime completedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
