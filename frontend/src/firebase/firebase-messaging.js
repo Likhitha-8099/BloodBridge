@@ -111,6 +111,38 @@ export const requestNotificationPermission = async () => {
 };
 
 /**
+ * Registers the Firebase Messaging Service Worker with environment configuration parameters.
+ *
+ * @returns {Promise<ServiceWorkerRegistration | null>}
+ */
+export const registerServiceWorker = async () => {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('[FCM] ⚠ Service Worker API not supported in this browser.');
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  });
+
+  const swUrl = `/firebase-messaging-sw.js?${params.toString()}`;
+
+  try {
+    const registration = await navigator.serviceWorker.register(swUrl);
+    console.info('[FCM] ✔ Service Worker registered with dynamic configuration.');
+    return registration;
+  } catch (err) {
+    console.error('[FCM] ✘ Service Worker registration failed:', err.message);
+    return null;
+  }
+};
+
+/**
  * Retrieves the FCM device registration token for this browser/device.
  *
  * Prerequisites:
@@ -144,7 +176,12 @@ export const getDeviceToken = async () => {
 
   try {
     console.info('[FCM] Requesting device registration token...');
-    const token = await getToken(messaging, { vapidKey });
+    const serviceWorkerRegistration = await registerServiceWorker();
+    const tokenOptions = { vapidKey };
+    if (serviceWorkerRegistration) {
+      tokenOptions.serviceWorkerRegistration = serviceWorkerRegistration;
+    }
+    const token = await getToken(messaging, tokenOptions);
 
     if (token) {
       console.info('[FCM] ✔ Device token obtained successfully.');
@@ -201,6 +238,7 @@ export const onForegroundMessage = async (callback) => {
 export default {
   isFcmSupported,
   getMessagingInstance,
+  registerServiceWorker,
   requestNotificationPermission,
   getDeviceToken,
   onForegroundMessage,
