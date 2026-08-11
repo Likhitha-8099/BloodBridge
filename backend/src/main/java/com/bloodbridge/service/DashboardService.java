@@ -91,4 +91,11 @@ public interface DashboardService {
      * @return system health response
      */
     SystemHealthResponse getSystemHealth();
+
+    /**
+     * Collects comprehensive analytics metrics for Push and Multi-Channel Notification delivery.
+     *
+     * @return push analytics response
+     */
+    com.bloodbridge.dto.response.PushAnalyticsResponse getPushNotificationAnalytics();
 }

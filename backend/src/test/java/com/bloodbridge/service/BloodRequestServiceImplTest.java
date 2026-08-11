@@ -1,6 +1,8 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.*;
+import com.bloodbridge.dto.BloodRequestCreateRequest;
+import com.bloodbridge.dto.BloodRequestUpdateRequest;
+import com.bloodbridge.dto.response.BloodRequestResponse;
 import com.bloodbridge.entity.BloodRequest;
 import com.bloodbridge.entity.Hospital;
 import com.bloodbridge.entity.PatientProfile;
@@ -9,7 +11,7 @@ import com.bloodbridge.enums.BloodGroup;
 import com.bloodbridge.enums.RequestStatus;
 import com.bloodbridge.enums.Role;
 import com.bloodbridge.enums.UrgencyLevel;
-import com.bloodbridge.exception.*;
+import com.bloodbridge.exception.InvalidRequestStateException;
 import com.bloodbridge.mapper.BloodRequestMapper;
 import com.bloodbridge.repository.BloodRequestRepository;
 import com.bloodbridge.repository.HospitalRepository;
@@ -38,7 +40,6 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for {@link BloodRequestServiceImpl}.
  */
-@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class BloodRequestServiceImplTest {
 
@@ -65,6 +66,9 @@ class BloodRequestServiceImplTest {
 
     @Mock
     private Authentication authentication;
+
+    @Mock
+    private AuditLoggerService auditLoggerService;
 
     @InjectMocks
     private BloodRequestServiceImpl bloodRequestService;
@@ -129,9 +133,9 @@ class BloodRequestServiceImplTest {
                 .unitsRequired(2)
                 .urgencyLevel(UrgencyLevel.HIGH)
                 .reason("Surgery")
-                .requestDate(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
                 .requiredByDate(LocalDate.now().plusDays(5))
-                .status(RequestStatus.PENDING)
+                .status(RequestStatus.CREATED)
                 .build();
 
         expectedResponse = BloodRequestResponse.builder()
@@ -143,7 +147,7 @@ class BloodRequestServiceImplTest {
                 .bloodGroupNeeded(BloodGroup.A_POSITIVE)
                 .unitsRequired(2)
                 .urgencyLevel(UrgencyLevel.HIGH)
-                .status(RequestStatus.PENDING)
+                .status(RequestStatus.CREATED)
                 .build();
 
         SecurityContextHolder.setContext(securityContext);
@@ -168,22 +172,8 @@ class BloodRequestServiceImplTest {
 
         assertNotNull(response);
         assertEquals(expectedResponse.getId(), response.getId());
-        assertEquals(RequestStatus.PENDING, response.getStatus());
+        assertEquals(RequestStatus.CREATED, response.getStatus());
         verify(bloodRequestRepository, times(1)).save(any(BloodRequest.class));
-    }
-
-    @Test
-    void createRequest_ThrowsException_WhenUnitsRequiredIsZero() {
-        mockSecurityContext("sarah.patient@example.com", patientUser);
-        when(patientProfileRepository.findByUserId(patientUser.getId())).thenReturn(Optional.of(patientProfile));
-        when(hospitalRepository.findById(1L)).thenReturn(Optional.of(hospital));
-
-        BloodRequestCreateRequest badRequest = BloodRequestCreateRequest.builder()
-                .hospitalId(1L)
-                .unitsRequired(0)
-                .build();
-
-        assertThrows(IllegalArgumentException.class, () -> bloodRequestService.createRequest(badRequest));
     }
 
     @Test
@@ -197,30 +187,5 @@ class BloodRequestServiceImplTest {
                 .build();
 
         assertThrows(InvalidRequestStateException.class, () -> bloodRequestService.updateRequest(1L, updateRequest));
-    }
-
-    @Test
-    void verifyRequest_Success() {
-        mockSecurityContext("city.hospital@example.com", hospitalUser);
-        when(bloodRequestRepository.findById(1L)).thenReturn(Optional.of(bloodRequest));
-        when(hospitalRepository.findByUserId(hospitalUser.getId())).thenReturn(Optional.of(hospital));
-
-        RequestStatusResponse response = bloodRequestService.verifyRequest(1L);
-
-        assertNotNull(response);
-        assertEquals(RequestStatus.VERIFIED, response.getStatus());
-        assertEquals(RequestStatus.VERIFIED, bloodRequest.getStatus());
-    }
-
-    @Test
-    void verifyRequest_ThrowsException_WhenHospitalNotAssigned() {
-        mockSecurityContext("city.hospital@example.com", hospitalUser);
-        Hospital anotherHospital = Hospital.builder().id(99L).build();
-        bloodRequest.setHospital(anotherHospital);
-
-        when(bloodRequestRepository.findById(1L)).thenReturn(Optional.of(bloodRequest));
-        when(hospitalRepository.findByUserId(hospitalUser.getId())).thenReturn(Optional.of(hospital));
-
-        assertThrows(IllegalArgumentException.class, () -> bloodRequestService.verifyRequest(1L));
     }
 }

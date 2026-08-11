@@ -32,6 +32,14 @@ public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long
     List<BloodRequest> findByHospitalId(Long hospitalId);
 
     /**
+     * Find blood requests assigned to a specific hospital profile ID ordered by newest first.
+     *
+     * @param hospitalId the hospital profile ID
+     * @return a list of blood requests
+     */
+    List<BloodRequest> findByHospitalIdOrderByCreatedAtDesc(Long hospitalId);
+
+    /**
      * Find blood requests matching a specific status.
      *
      * @param status the request status

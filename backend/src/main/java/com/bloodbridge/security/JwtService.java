@@ -6,19 +6,20 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Service responsible for JWT operations including generation, parsing, and validation.
+ * Service responsible for JWT operations including token generation, parsing, and validation.
  */
-@SuppressWarnings("null")
 @Service
 public class JwtService {
 
@@ -49,6 +50,26 @@ public class JwtService {
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
+    }
+
+    /**
+     * Generates a JWT token for a User entity directly.
+     *
+     * @param user target User entity
+     * @return the generated JWT token
+     */
+    public String generateToken(com.bloodbridge.entity.User user) {
+        if (user == null) {
+            return null;
+        }
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword() != null ? user.getPassword() : "",
+                Boolean.TRUE.equals(user.getActive()),
+                true, true, true,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + (user.getRole() != null ? user.getRole().name() : "USER")))
+        );
+        return generateToken(userDetails);
     }
 
     /**

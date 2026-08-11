@@ -17,5 +17,10 @@ public enum NotificationStatus {
     /**
      * Notification delivery failed.
      */
-    FAILED
+    FAILED,
+
+    /**
+     * Notification is currently being retried.
+     */
+    RETRYING
 }

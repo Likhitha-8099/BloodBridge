@@ -4,33 +4,19 @@ package com.bloodbridge.enums;
  * Enumeration representing the possible states of a blood request in the system.
  */
 public enum RequestStatus {
-    /**
-     * Request is registered and awaiting hospital verification.
-     */
+    CREATED,
     PENDING,
-
-    /**
-     * Request has been verified by the assigned hospital.
-     */
+    ACTIVE,
     VERIFIED,
-
-    /**
-     * Request has been matched with eligible donors.
-     */
+    MATCHING,
     MATCHED,
-
-    /**
-     * Request has been successfully fulfilled and closed.
-     */
+    DONOR_NOTIFIED,
+    DONOR_ACCEPTED,
+    FULFILLMENT_IN_PROGRESS,
+    IN_PROGRESS,
+    FULFILLED,
     COMPLETED,
-
-    /**
-     * Request was cancelled by the patient.
-     */
     CANCELLED,
-
-    /**
-     * Request was rejected by the assigned hospital.
-     */
-    REJECTED
+    REJECTED,
+    EXPIRED
 }

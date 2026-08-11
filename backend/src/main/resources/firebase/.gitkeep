@@ -1,0 +1,3 @@
+# This folder holds the Firebase Service Account JSON.
+# The actual JSON file is listed in .gitignore and must NEVER be committed to version control.
+# Place your downloaded firebase-service-account.json file here.

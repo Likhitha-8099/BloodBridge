@@ -1,61 +1,115 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.ApiResponse;
-import com.bloodbridge.dto.PatientProfileRequest;
-import com.bloodbridge.dto.PatientProfileResponse;
-import com.bloodbridge.dto.PatientSummaryResponse;
+import com.bloodbridge.dto.request.CreateBloodRequestRequest;
+import com.bloodbridge.dto.request.CreatePatientProfileRequest;
+import com.bloodbridge.dto.request.UpdateBloodRequestRequest;
+import com.bloodbridge.dto.request.UpdatePatientProfileRequest;
+import com.bloodbridge.dto.response.ApiResponse;
+import com.bloodbridge.dto.response.BloodRequestResponse;
+import com.bloodbridge.dto.response.PatientDashboardResponse;
+import com.bloodbridge.dto.response.PatientProfileResponse;
+import com.bloodbridge.dto.response.RequestTimelineResponse;
 
 import java.util.List;
 
 /**
- * Service interface defining workflows for managing patient profiles.
+ * Service interface for Patient Management & Emergency Blood Request Portal workflows.
  */
 public interface PatientProfileService {
 
     /**
-     * Creates a new patient profile for the currently authenticated user.
+     * Creates a new patient profile for an authenticated user with role PATIENT.
      *
-     * @param request the profile details
-     * @return the created profile response
+     * @param email authenticated user email
+     * @param request creation request
+     * @return ApiResponse containing PatientProfileResponse
      */
-    PatientProfileResponse createProfile(PatientProfileRequest request);
+    ApiResponse<PatientProfileResponse> createProfile(String email, CreatePatientProfileRequest request);
 
     /**
-     * Retrieves the profile of the currently authenticated patient.
+     * Retrieves current patient profile.
      *
-     * @return the patient's profile details
+     * @param email authenticated user email
+     * @return ApiResponse containing PatientProfileResponse
      */
-    PatientProfileResponse getMyProfile();
+    ApiResponse<PatientProfileResponse> getMyProfile(String email);
 
     /**
-     * Updates the profile of the currently authenticated patient.
+     * Updates patient profile details.
      *
-     * @param request the updated details
-     * @return the updated profile response
+     * @param email authenticated user email
+     * @param request update request
+     * @return ApiResponse containing updated PatientProfileResponse
      */
-    PatientProfileResponse updateProfile(PatientProfileRequest request);
+    ApiResponse<PatientProfileResponse> updateProfile(String email, UpdatePatientProfileRequest request);
 
     /**
-     * Deletes the profile of the currently authenticated patient.
+     * Soft deletes (deactivates) patient profile.
      *
-     * @return an {@link ApiResponse} confirming deletion status
+     * @param email authenticated user email
+     * @return ApiResponse confirming deletion status
      */
-    ApiResponse deleteProfile();
+    ApiResponse<String> deleteProfile(String email);
 
     /**
-     * Retrieves a patient's profile by their profile ID.
-     * Typically accessible by ADMIN or HOSPITAL roles.
+     * Retrieves Patient Dashboard summary metrics.
      *
-     * @param id the patient profile ID
-     * @return the detailed patient profile response
+     * @param email authenticated user email
+     * @return ApiResponse containing PatientDashboardResponse
      */
-    PatientProfileResponse getPatientById(Long id);
+    ApiResponse<PatientDashboardResponse> getDashboard(String email);
 
     /**
-     * Retrieves a summary of all patient profiles in the system.
-     * Restricted to ADMIN role.
+     * Creates a new emergency blood request.
      *
-     * @return a list of all patient profiles
+     * @param email authenticated user email
+     * @param request emergency blood request creation payload
+     * @return ApiResponse containing BloodRequestResponse
      */
-    List<PatientSummaryResponse> getAllPatients();
+    ApiResponse<BloodRequestResponse> createBloodRequest(String email, CreateBloodRequestRequest request);
+
+    /**
+     * Retrieves all blood requests registered by current patient.
+     *
+     * @param email authenticated user email
+     * @return ApiResponse containing list of BloodRequestResponse items
+     */
+    ApiResponse<List<BloodRequestResponse>> getMyBloodRequests(String email);
+
+    /**
+     * Retrieves a specific blood request by ID.
+     *
+     * @param email authenticated user email
+     * @param requestId blood request ID
+     * @return ApiResponse containing BloodRequestResponse
+     */
+    ApiResponse<BloodRequestResponse> getBloodRequestById(String email, Long requestId);
+
+    /**
+     * Updates an existing uncompleted blood request.
+     *
+     * @param email authenticated user email
+     * @param requestId blood request ID
+     * @param request update request payload
+     * @return ApiResponse containing updated BloodRequestResponse
+     */
+    ApiResponse<BloodRequestResponse> updateBloodRequest(String email, Long requestId, UpdateBloodRequestRequest request);
+
+    /**
+     * Cancels an active blood request.
+     *
+     * @param email authenticated user email
+     * @param requestId blood request ID
+     * @return ApiResponse containing cancelled BloodRequestResponse
+     */
+    ApiResponse<BloodRequestResponse> cancelBloodRequest(String email, Long requestId);
+
+    /**
+     * Retrieves real-time status tracking timeline for a blood request.
+     *
+     * @param email authenticated user email
+     * @param requestId blood request ID
+     * @return ApiResponse containing RequestTimelineResponse
+     */
+    ApiResponse<RequestTimelineResponse> getBloodRequestTimeline(String email, Long requestId);
 }

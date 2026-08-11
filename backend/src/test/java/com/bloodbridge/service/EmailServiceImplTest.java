@@ -1,6 +1,8 @@
 package com.bloodbridge.service;
 
+import com.bloodbridge.dto.EmergencyMailDto;
 import com.bloodbridge.service.impl.EmailServiceImpl;
+import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,12 +17,14 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for {@link EmailServiceImpl}.
  */
-@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class EmailServiceImplTest {
 
     @Mock
     private JavaMailSender mailSender;
+
+    @Mock
+    private MimeMessage mimeMessage;
 
     @InjectMocks
     private EmailServiceImpl emailService;
@@ -29,6 +33,65 @@ class EmailServiceImplTest {
     void sendEmail_Success() {
         emailService.sendEmail("test@example.com", "Test Subject", "Test Body");
         verify(mailSender, times(1)).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void sendEmergencyAlert_Success() {
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        EmergencyMailDto mailDto = EmergencyMailDto.builder()
+                .toEmail("donor@example.com")
+                .donorName("John Donor")
+                .hospitalName("General Hospital")
+                .bloodGroup("O_POSITIVE")
+                .unitsRequired(2)
+                .urgencyLevel("HIGH")
+                .hospitalAddress("123 Health Ave")
+                .city("Bangalore")
+                .state("Karnataka")
+                .requiredByDate("2026-08-10")
+                .reason("Emergency Surgery")
+                .loginUrl("http://localhost:5173/login")
+                .build();
+
+        emailService.sendEmergencyAlert(mailDto);
+
+        verify(mailSender, times(1)).createMimeMessage();
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void sendEmergencyAlert_InvalidRecipient_Skipped() {
+        EmergencyMailDto mailDto = EmergencyMailDto.builder()
+                .toEmail("")
+                .donorName("John Donor")
+                .build();
+
+        emailService.sendEmergencyAlert(mailDto);
+
+        verify(mailSender, never()).createMimeMessage();
+        verify(mailSender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void sendEmergencyAlert_SmtpException_HandledGracefully() {
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        doThrow(new RuntimeException("SMTP Authentication Failed 535"))
+                .when(mailSender).send(any(MimeMessage.class));
+
+        EmergencyMailDto mailDto = EmergencyMailDto.builder()
+                .toEmail("donor@example.com")
+                .donorName("John Donor")
+                .hospitalName("General Hospital")
+                .bloodGroup("O_POSITIVE")
+                .unitsRequired(2)
+                .urgencyLevel("HIGH")
+                .build();
+
+        // Should not throw exception upstream
+        emailService.sendEmergencyAlert(mailDto);
+
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
     }
 
     @Test

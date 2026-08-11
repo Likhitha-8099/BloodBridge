@@ -14,7 +14,9 @@ import java.time.LocalDateTime;
  * Entity representing a matching result between a blood request and an eligible donor.
  */
 @Entity
-@Table(name = "match_results")
+@Table(name = "match_results", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"blood_request_id", "donor_profile_id"})
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -38,18 +40,43 @@ public class MatchResult {
     @NotNull(message = "Donor profile reference is required")
     private DonorProfile donor;
 
-    @NotNull(message = "Compatibility score is required")
-    @Column(name = "compatibility_score", nullable = false)
-    private Integer compatibilityScore;
+    @Column(name = "match_score", nullable = false)
+    private Double matchScore;
 
-    @NotNull(message = "Matched timestamp is required")
-    @Column(name = "matched_at", nullable = false)
-    private LocalDateTime matchedAt;
+    @Column(name = "blood_compatibility_score")
+    private Double bloodCompatibilityScore;
+
+    @Column(name = "compatibility_score")
+    private Double compatibilityScore;
+
+    @Column(name = "distance_score")
+    private Double distanceScore;
+
+    @Column(name = "availability_score")
+    private Double availabilityScore;
+
+    @Column(name = "donor_score")
+    private Double donorScore;
+
+    @Column(name = "eligibility_status")
+    private String eligibilityStatus;
+
+    @Column(name = "distance_km")
+    private Double distanceKm;
+
+    @Column(name = "estimated_travel_time")
+    private Integer estimatedTravelTime;
+
+    @Column(name = "rank_position")
+    private Integer rank;
 
     @Enumerated(EnumType.STRING)
     @NotNull(message = "Match status is required")
     @Column(name = "status", nullable = false)
     private MatchStatus status;
+
+    @Column(name = "matched_at")
+    private LocalDateTime matchedAt;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -58,4 +85,19 @@ public class MatchResult {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public BloodRequest getBloodRequest() { return bloodRequest; }
+    public void setBloodRequest(BloodRequest bloodRequest) { this.bloodRequest = bloodRequest; }
+    public DonorProfile getDonor() { return donor; }
+    public void setDonor(DonorProfile donor) { this.donor = donor; }
+    public Double getMatchScore() { return matchScore; }
+    public void setMatchScore(Double matchScore) { this.matchScore = matchScore; }
+    public Double getDistanceKm() { return distanceKm; }
+    public void setDistanceKm(Double distanceKm) { this.distanceKm = distanceKm; }
+    public Integer getRank() { return rank; }
+    public void setRank(Integer rank) { this.rank = rank; }
+    public MatchStatus getStatus() { return status; }
+    public void setStatus(MatchStatus status) { this.status = status; }
 }

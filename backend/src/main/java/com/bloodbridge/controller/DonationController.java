@@ -18,11 +18,12 @@ import java.util.List;
  * REST controller for donation tracking and fulfillment.
  */
 @RestController
-@RequestMapping("/api/donations")
+@RequestMapping({"/api/v1/donations", "/api/donations"})
 @RequiredArgsConstructor
 public class DonationController {
 
     private final DonationService donationService;
+    private final com.bloodbridge.service.CertificateService certificateService;
 
     /**
      * Donor accepts a match request, transitioning the state and creating a donation.
@@ -171,5 +172,33 @@ public class DonationController {
     public ResponseEntity<DonationStatisticsResponse> getDonationStatistics() {
         DonationStatisticsResponse response = donationService.getDonationStatistics();
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Retrieves donation history for the authenticated donor.
+     */
+    @GetMapping("/my-donations")
+    @PreAuthorize("hasAnyRole('DONOR', 'ADMIN')")
+    public ResponseEntity<List<DonationSummaryResponse>> getMyDonations(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails
+    ) {
+        List<DonationSummaryResponse> response = donationService.getMyDonations(userDetails.getUsername());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Downloads/renders PDF certificate for a completed blood donation.
+     */
+    @GetMapping("/{id}/certificate")
+    @PreAuthorize("hasAnyRole('DONOR', 'ADMIN')")
+    public ResponseEntity<byte[]> getCertificate(
+            @PathVariable Long id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails
+    ) {
+        byte[] pdf = certificateService.getCertificatePdfForDonor(id, userDetails.getUsername());
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"BloodBridge_Certificate_" + id + ".pdf\"")
+                .body(pdf);
     }
 }

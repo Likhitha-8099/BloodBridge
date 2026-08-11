@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Global exception handler that intercepts exceptions across all controllers
@@ -87,27 +85,20 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
-        List<ErrorResponse.ValidationError> errors = ex.getBindingResult()
-                .getFieldErrors()
-                .stream()
-                .map(fieldError -> ErrorResponse.ValidationError.builder()
-                        .field(fieldError.getField())
-                        .message(fieldError.getDefaultMessage())
-                        .build())
-                .collect(Collectors.toList());
+        java.util.Map<String, String> fieldErrorsMap = new java.util.LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(fieldError -> {
+            fieldErrorsMap.put(fieldError.getField(), fieldError.getDefaultMessage());
+        });
 
-        String detailedMessage = "Validation failed: " + errors.stream()
-                .map(err -> err.getField() + ": " + err.getMessage())
-                .collect(Collectors.joining(", "));
-
-        log.warn("Validation failed for request. Errors: {}", detailedMessage);
+        log.warn("Validation failed for request. Errors: {}", fieldErrorsMap);
 
         ErrorResponse response = ErrorResponse.builder()
+                .success(false)
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Bad Request")
-                .message(detailedMessage)
-                .errors(errors)
+                .message("Validation Failed")
+                .errors(fieldErrorsMap)
                 .build();
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
@@ -455,6 +446,36 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .build();
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Handles ResponseStatusException (e.g. 403 Forbidden, 404 Not Found from services).
+     */
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(org.springframework.web.server.ResponseStatusException ex) {
+        log.warn("ResponseStatusException: status={}, reason={}", ex.getStatusCode(), ex.getReason());
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(ex.getStatusCode().value())
+                .error(ex.getStatusCode().toString())
+                .message(ex.getReason() != null ? ex.getReason() : ex.getMessage())
+                .build();
+        return new ResponseEntity<>(response, ex.getStatusCode());
+    }
+
+    /**
+     * Handles Spring MVC NoResourceFoundException (404 for unmapped API endpoints).
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        log.warn("NoResourceFoundException: {}", ex.getMessage());
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Not Found")
+                .message("API endpoint or resource not found: /" + ex.getResourcePath())
+                .build();
+        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
     }
 
     /**

@@ -35,8 +35,7 @@ public class Donation {
     private DonorProfile donor;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "patient_profile_id", nullable = false)
-    @NotNull(message = "Patient profile reference is required")
+    @JoinColumn(name = "patient_profile_id", nullable = true)
     private PatientProfile patient;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -50,8 +49,7 @@ public class Donation {
     private Hospital hospital;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "match_result_id", nullable = false)
-    @NotNull(message = "Match result reference is required")
+    @JoinColumn(name = "match_result_id", nullable = true)
     private MatchResult matchResult;
 
     @Column(name = "donation_date")
@@ -62,6 +60,12 @@ public class Donation {
 
     @Column(name = "remarks", length = 1000)
     private String remarks;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "certificate_id", length = 100)
+    private String certificateId;
 
     @Enumerated(EnumType.STRING)
     @NotNull(message = "Donation status is required")

@@ -35,7 +35,7 @@ public class MatchMapper {
                 .donorName(donorUser != null ? donorUser.getFullName() : null)
                 .donorBloodGroup(donor != null ? donor.getBloodGroup() : null)
                 .donorCity(donor != null ? donor.getCity() : null)
-                .compatibilityScore(result.getCompatibilityScore())
+                .compatibilityScore(result.getBloodCompatibilityScore() != null ? result.getBloodCompatibilityScore().intValue() : (result.getMatchScore() != null ? result.getMatchScore().intValue() : 100))
                 .matchedAt(result.getMatchedAt())
                 .status(result.getStatus())
                 .build();
@@ -60,7 +60,7 @@ public class MatchMapper {
                 .requestId(result.getBloodRequest() != null ? result.getBloodRequest().getId() : null)
                 .donorId(donor != null ? donor.getId() : null)
                 .donorName(donorUser != null ? donorUser.getFullName() : null)
-                .compatibilityScore(result.getCompatibilityScore())
+                .compatibilityScore(result.getBloodCompatibilityScore() != null ? result.getBloodCompatibilityScore().intValue() : (result.getMatchScore() != null ? result.getMatchScore().intValue() : 100))
                 .status(result.getStatus())
                 .build();
     }

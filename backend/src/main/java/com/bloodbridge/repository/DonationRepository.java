@@ -63,6 +63,21 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
     long countByStatus(DonationStatus status);
 
     /**
+     * Counts pending/active donations for a hospital matching given statuses.
+     */
+    long countByHospitalIdAndStatusIn(Long hospitalId, Collection<DonationStatus> statuses);
+
+    /**
+     * Counts pending/active donations for a donor matching given statuses.
+     */
+    long countByDonorIdAndStatusIn(Long donorId, Collection<DonationStatus> statuses);
+
+    /**
+     * Finds donations by donor ID, blood request ID, and status list.
+     */
+    List<Donation> findByDonorIdAndBloodRequestIdAndStatusIn(Long donorId, Long requestId, Collection<DonationStatus> statuses);
+
+    /**
      * Checks if a donation already exists for a specific match result in any of the specified statuses.
      * Helps check if a donor attempts to accept the request twice.
      *
@@ -71,6 +86,16 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
      * @return true if a donation exists in those states, false otherwise
      */
     boolean existsByMatchResultIdAndStatusIn(Long matchResultId, Collection<DonationStatus> statuses);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d FROM Donation d " +
+           "LEFT JOIN d.donor dp " +
+           "LEFT JOIN dp.user u " +
+           "WHERE (dp.id = :donorId OR (u.id = :userId) OR (dp.email = :userEmail) OR (u.email = :userEmail)) " +
+           "ORDER BY d.createdAt DESC")
+    List<Donation> findDonationsForDonorUser(
+            @org.springframework.data.repository.query.Param("donorId") Long donorId,
+            @org.springframework.data.repository.query.Param("userId") Long userId,
+            @org.springframework.data.repository.query.Param("userEmail") String userEmail);
 
     /**
      * Aggregate monthly donation counts starting from a specific date.

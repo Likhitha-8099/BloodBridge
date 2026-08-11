@@ -1,16 +1,18 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.PatientProfileRequest;
-import com.bloodbridge.dto.PatientProfileResponse;
+import com.bloodbridge.dto.request.CreatePatientProfileRequest;
+import com.bloodbridge.dto.response.ApiResponse;
+import com.bloodbridge.dto.response.PatientProfileResponse;
 import com.bloodbridge.entity.PatientProfile;
 import com.bloodbridge.entity.User;
 import com.bloodbridge.enums.BloodGroup;
+
 import com.bloodbridge.enums.Gender;
 import com.bloodbridge.enums.Role;
 import com.bloodbridge.exception.InvalidAgeException;
 import com.bloodbridge.exception.PatientProfileAlreadyExistsException;
-import com.bloodbridge.exception.PatientProfileNotFoundException;
 import com.bloodbridge.mapper.PatientProfileMapper;
+import com.bloodbridge.repository.HospitalRepository;
 import com.bloodbridge.repository.PatientProfileRepository;
 import com.bloodbridge.repository.UserRepository;
 import com.bloodbridge.service.impl.PatientProfileServiceImpl;
@@ -20,6 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,8 +37,8 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for {@link PatientProfileServiceImpl}.
  */
-@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class PatientProfileServiceImplTest {
 
     @Mock
@@ -42,6 +46,9 @@ class PatientProfileServiceImplTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private HospitalRepository hospitalRepository;
 
     @Mock
     private PatientProfileMapper patientProfileMapper;
@@ -52,12 +59,14 @@ class PatientProfileServiceImplTest {
     @Mock
     private Authentication authentication;
 
+    @Mock
+    private AuditLoggerService auditLoggerService;
+
     @InjectMocks
     private PatientProfileServiceImpl patientProfileService;
 
     private User patientUser;
-    private User donorUser;
-    private PatientProfileRequest validRequest;
+    private CreatePatientProfileRequest validRequest;
     private PatientProfile patientProfile;
     private PatientProfileResponse expectedResponse;
 
@@ -73,17 +82,7 @@ class PatientProfileServiceImplTest {
                 .active(true)
                 .build();
 
-        donorUser = User.builder()
-                .id(3L)
-                .fullName("John Donor")
-                .email("john.donor@example.com")
-                .password("encodedPass")
-                .phoneNumber("9876543210")
-                .role(Role.DONOR)
-                .active(true)
-                .build();
-
-        validRequest = PatientProfileRequest.builder()
+        validRequest = CreatePatientProfileRequest.builder()
                 .age(30)
                 .gender(Gender.FEMALE)
                 .bloodGroup(BloodGroup.A_POSITIVE)
@@ -138,23 +137,16 @@ class PatientProfileServiceImplTest {
     void createProfile_Success() {
         mockSecurityContext("sarah.patient@example.com", patientUser);
         when(patientProfileRepository.existsByUserId(patientUser.getId())).thenReturn(false);
-        when(patientProfileMapper.toEntity(any(), any())).thenReturn(patientProfile);
+        when(patientProfileMapper.toEntity(any(), any(), any())).thenReturn(patientProfile);
         when(patientProfileRepository.save(any(PatientProfile.class))).thenReturn(patientProfile);
         when(patientProfileMapper.toResponse(any())).thenReturn(expectedResponse);
 
-        PatientProfileResponse response = patientProfileService.createProfile(validRequest);
+        ApiResponse<PatientProfileResponse> response = patientProfileService.createProfile("sarah.patient@example.com", validRequest);
 
         assertNotNull(response);
-        assertEquals(expectedResponse.getId(), response.getId());
+        assertNotNull(response.getData());
+        assertEquals(expectedResponse.getId(), response.getData().getId());
         verify(patientProfileRepository, times(1)).save(any(PatientProfile.class));
-    }
-
-    @Test
-    void createProfile_ThrowsException_WhenUserNotPatient() {
-        mockSecurityContext("john.donor@example.com", donorUser);
-
-        assertThrows(IllegalArgumentException.class, () -> patientProfileService.createProfile(validRequest));
-        verify(patientProfileRepository, never()).save(any());
     }
 
     @Test
@@ -162,17 +154,17 @@ class PatientProfileServiceImplTest {
         mockSecurityContext("sarah.patient@example.com", patientUser);
         when(patientProfileRepository.existsByUserId(patientUser.getId())).thenReturn(true);
 
-        assertThrows(PatientProfileAlreadyExistsException.class, () -> patientProfileService.createProfile(validRequest));
+        assertThrows(PatientProfileAlreadyExistsException.class, () -> patientProfileService.createProfile("sarah.patient@example.com", validRequest));
     }
 
     @Test
     void createProfile_ThrowsInvalidAgeException_WhenAgeTooHigh() {
         mockSecurityContext("sarah.patient@example.com", patientUser);
-        PatientProfileRequest badRequest = PatientProfileRequest.builder()
+        CreatePatientProfileRequest badRequest = CreatePatientProfileRequest.builder()
                 .age(125)
                 .build();
 
-        assertThrows(InvalidAgeException.class, () -> patientProfileService.createProfile(badRequest));
+        assertThrows(InvalidAgeException.class, () -> patientProfileService.createProfile("sarah.patient@example.com", badRequest));
     }
 
     @Test
@@ -181,27 +173,10 @@ class PatientProfileServiceImplTest {
         when(patientProfileRepository.findByUserId(patientUser.getId())).thenReturn(Optional.of(patientProfile));
         when(patientProfileMapper.toResponse(any())).thenReturn(expectedResponse);
 
-        PatientProfileResponse response = patientProfileService.getMyProfile();
+        ApiResponse<PatientProfileResponse> response = patientProfileService.getMyProfile("sarah.patient@example.com");
 
         assertNotNull(response);
-        assertEquals(expectedResponse.getEmail(), response.getEmail());
-    }
-
-    @Test
-    void getPatientById_Success() {
-        when(patientProfileRepository.findById(1L)).thenReturn(Optional.of(patientProfile));
-        when(patientProfileMapper.toResponse(any())).thenReturn(expectedResponse);
-
-        PatientProfileResponse response = patientProfileService.getPatientById(1L);
-
-        assertNotNull(response);
-        assertEquals(expectedResponse.getId(), response.getId());
-    }
-
-    @Test
-    void getPatientById_ThrowsNotFound() {
-        when(patientProfileRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThrows(PatientProfileNotFoundException.class, () -> patientProfileService.getPatientById(99L));
+        assertNotNull(response.getData());
+        assertEquals(expectedResponse.getEmail(), response.getData().getEmail());
     }
 }

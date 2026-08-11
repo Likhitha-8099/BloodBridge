@@ -1,11 +1,28 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.*;
-import com.bloodbridge.entity.*;
-import com.bloodbridge.enums.*;
-import com.bloodbridge.exception.*;
+import com.bloodbridge.dto.DonationResponse;
+import com.bloodbridge.dto.DonationStatusUpdateRequest;
+import com.bloodbridge.entity.BloodRequest;
+import com.bloodbridge.entity.Donation;
+import com.bloodbridge.entity.DonorProfile;
+import com.bloodbridge.entity.Hospital;
+import com.bloodbridge.entity.MatchResult;
+import com.bloodbridge.entity.User;
+import com.bloodbridge.enums.BloodGroup;
+import com.bloodbridge.enums.DonationStatus;
+import com.bloodbridge.enums.MatchStatus;
+import com.bloodbridge.enums.RequestStatus;
+import com.bloodbridge.enums.Role;
+import com.bloodbridge.exception.DuplicateDonationException;
 import com.bloodbridge.mapper.DonationMapper;
-import com.bloodbridge.repository.*;
+import com.bloodbridge.repository.BloodRequestRepository;
+import com.bloodbridge.repository.DonationRepository;
+import com.bloodbridge.repository.DonorProfileRepository;
+import com.bloodbridge.repository.HospitalRepository;
+import com.bloodbridge.repository.MatchResultRepository;
+import com.bloodbridge.repository.MatchedEmergencyDonorRepository;
+import com.bloodbridge.repository.PatientProfileRepository;
+import com.bloodbridge.repository.UserRepository;
 import com.bloodbridge.service.impl.DonationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +35,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +46,6 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for {@link DonationServiceImpl}.
  */
-@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class DonationServiceImplTest {
 
@@ -58,6 +75,24 @@ class DonationServiceImplTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private EmailService emailService;
+
+    @Mock
+    private CertificateService certificateService;
+
+    @Mock
+    private RealtimeService realtimeService;
+
+    @Mock
+    private MatchedEmergencyDonorRepository matchedEmergencyDonorRepository;
+
+    @Mock
+    private AuditLoggerService auditLoggerService;
 
     @Mock
     private SecurityContext securityContext;
@@ -112,6 +147,7 @@ class DonationServiceImplTest {
                 .id(1L)
                 .unitsRequired(2)
                 .status(RequestStatus.VERIFIED)
+                .hospital(hospital)
                 .build();
 
         matchResult = MatchResult.builder()
@@ -149,7 +185,7 @@ class DonationServiceImplTest {
         mockSecurityContext("sarah.donor@example.com", donorUser);
         when(matchResultRepository.findById(1L)).thenReturn(Optional.of(matchResult));
         when(donorProfileRepository.findByUserId(donorUser.getId())).thenReturn(Optional.of(donorProfile));
-        when(donationRepository.existsByMatchResultIdAndStatusIn(eq(1L), any())).thenReturn(false);
+        when(donationRepository.findByDonorIdAndBloodRequestIdAndStatusIn(eq(1L), eq(1L), any())).thenReturn(Collections.emptyList());
         when(donationRepository.save(any(Donation.class))).thenReturn(donation);
         when(donationMapper.toResponse(any())).thenReturn(expectedResponse);
 
@@ -166,7 +202,7 @@ class DonationServiceImplTest {
         mockSecurityContext("sarah.donor@example.com", donorUser);
         when(matchResultRepository.findById(1L)).thenReturn(Optional.of(matchResult));
         when(donorProfileRepository.findByUserId(donorUser.getId())).thenReturn(Optional.of(donorProfile));
-        when(donationRepository.existsByMatchResultIdAndStatusIn(eq(1L), any())).thenReturn(true);
+        when(donationRepository.findByDonorIdAndBloodRequestIdAndStatusIn(eq(1L), eq(1L), any())).thenReturn(List.of(donation));
 
         assertThrows(DuplicateDonationException.class, () -> donationService.acceptDonation(1L));
     }

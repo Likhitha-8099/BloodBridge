@@ -1,7 +1,7 @@
 package com.bloodbridge.controller;
 
 import com.bloodbridge.dto.BloodRequestCreateRequest;
-import com.bloodbridge.dto.BloodRequestResponse;
+import com.bloodbridge.dto.response.BloodRequestResponse;
 import com.bloodbridge.dto.BloodRequestSummaryResponse;
 import com.bloodbridge.dto.BloodRequestUpdateRequest;
 import com.bloodbridge.dto.RequestStatusResponse;
@@ -22,7 +22,7 @@ import java.util.List;
  * Endpoint access is secured using method-level Spring Security annotations.
  */
 @RestController
-@RequestMapping("/api/requests")
+@RequestMapping({"/api/v1/requests", "/api/requests"})
 @RequiredArgsConstructor
 public class BloodRequestController {
 
@@ -35,7 +35,7 @@ public class BloodRequestController {
      * @return the created request with status 201 (Created)
      */
     @PostMapping
-    @PreAuthorize("hasRole('PATIENT')")
+    @PreAuthorize("hasAnyRole('PATIENT', 'HOSPITAL', 'ADMIN')")
     public ResponseEntity<BloodRequestResponse> createRequest(@Valid @RequestBody BloodRequestCreateRequest request) {
         BloodRequestResponse response = bloodRequestService.createRequest(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);

@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * Standardized structure for error responses returned by the API.
@@ -21,11 +20,13 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
 
+    @Builder.Default
+    private Boolean success = false;
     private LocalDateTime timestamp;
     private int status;
     private String error;
     private String message;
-    private List<ValidationError> errors;
+    private Object errors;
 
     /**
      * Represents a single validation error on a field.

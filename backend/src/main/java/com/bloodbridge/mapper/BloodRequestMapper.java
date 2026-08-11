@@ -1,7 +1,7 @@
 package com.bloodbridge.mapper;
 
 import com.bloodbridge.dto.BloodRequestCreateRequest;
-import com.bloodbridge.dto.BloodRequestResponse;
+import com.bloodbridge.dto.response.BloodRequestResponse;
 import com.bloodbridge.dto.BloodRequestSummaryResponse;
 import com.bloodbridge.entity.BloodRequest;
 import com.bloodbridge.entity.Hospital;
@@ -94,10 +94,18 @@ public class BloodRequestMapper {
         return BloodRequestSummaryResponse.builder()
                 .id(request.getId())
                 .patientName((patient != null && patient.getUser() != null) ? patient.getUser().getFullName() : null)
+                .patientCity((patient != null && patient.getUser() != null) ? patient.getUser().getCity() : null)
+                .patientState((patient != null && patient.getUser() != null) ? patient.getUser().getState() : null)
                 .hospitalName(hospital != null ? hospital.getHospitalName() : null)
+                .hospitalAddress(hospital != null ? hospital.getAddress() : null)
+                .hospitalCity(hospital != null ? hospital.getCity() : null)
+                .hospitalState(hospital != null ? hospital.getState() : null)
+                .latitude(hospital != null ? hospital.getLatitude() : null)
+                .longitude(hospital != null ? hospital.getLongitude() : null)
                 .bloodGroupNeeded(request.getBloodGroupNeeded())
                 .unitsRequired(request.getUnitsRequired())
                 .urgencyLevel(request.getUrgencyLevel())
+                .reason(request.getReason())
                 .requiredByDate(request.getRequiredByDate())
                 .status(request.getStatus())
                 .build();

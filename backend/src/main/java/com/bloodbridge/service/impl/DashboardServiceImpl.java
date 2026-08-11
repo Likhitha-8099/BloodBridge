@@ -37,6 +37,8 @@ public class DashboardServiceImpl implements DashboardService {
     private final DonationRepository donationRepository;
     private final MatchResultRepository matchResultRepository;
     private final NotificationRepository notificationRepository;
+    private final EmailNotificationRepository emailNotificationRepository;
+    private final PushDeliveryLogRepository pushDeliveryLogRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -59,19 +61,144 @@ public class DashboardServiceImpl implements DashboardService {
     @Transactional(readOnly = true)
     public UserStatisticsResponse getUserStatistics() {
         long total = userRepository.count();
-        long donors = donorProfileRepository.count();
+        long donorsCount = donorProfileRepository.count();
         long patients = patientProfileRepository.count();
         long hospitals = hospitalRepository.count();
         long active = userRepository.countByActive(true);
         long inactive = userRepository.countByActive(false);
 
+        List<com.bloodbridge.entity.DonorProfile> donors = donorProfileRepository.findAll();
+        List<com.bloodbridge.entity.User> users = userRepository.findAll();
+
+        long availableDonors = donors.stream().filter(dp -> Boolean.TRUE.equals(dp.getAvailableForDonation())).count();
+        long emergencyAvailableDonors = donors.stream().filter(dp -> Boolean.TRUE.equals(dp.getEmergencyAvailable())).count();
+        long eligibleDonors = donors.stream().filter(dp -> dp.getNextEligibleDate() == null || !dp.getNextEligibleDate().isAfter(LocalDate.now())).count();
+        long cooldownDonors = donors.stream().filter(dp -> dp.getNextEligibleDate() != null && dp.getNextEligibleDate().isAfter(LocalDate.now())).count();
+
+        // Blood group distribution
+        Map<String, Long> bloodGroupMap = new LinkedHashMap<>();
+        for (com.bloodbridge.enums.BloodGroup bg : com.bloodbridge.enums.BloodGroup.values()) {
+            bloodGroupMap.put(bg.name(), 0L);
+        }
+        for (com.bloodbridge.entity.DonorProfile dp : donors) {
+            if (dp.getBloodGroup() != null) {
+                String key = dp.getBloodGroup().name();
+                bloodGroupMap.put(key, bloodGroupMap.getOrDefault(key, 0L) + 1);
+            }
+        }
+
+        // Gender distribution
+        Map<String, Long> genderMap = new LinkedHashMap<>();
+        for (com.bloodbridge.entity.DonorProfile dp : donors) {
+            String g = dp.getGender() != null ? dp.getGender().name() : "UNSPECIFIED";
+            genderMap.put(g, genderMap.getOrDefault(g, 0L) + 1);
+        }
+
+        // Age distribution
+        Map<String, Long> ageMap = new LinkedHashMap<>();
+        ageMap.put("18-25", 0L);
+        ageMap.put("26-35", 0L);
+        ageMap.put("36-45", 0L);
+        ageMap.put("46-55", 0L);
+        ageMap.put("56-65", 0L);
+        for (com.bloodbridge.entity.DonorProfile dp : donors) {
+            if (dp.getAge() != null) {
+                int age = dp.getAge();
+                if (age <= 25) ageMap.put("18-25", ageMap.get("18-25") + 1);
+                else if (age <= 35) ageMap.put("26-35", ageMap.get("26-35") + 1);
+                else if (age <= 45) ageMap.put("36-45", ageMap.get("36-45") + 1);
+                else if (age <= 55) ageMap.put("46-55", ageMap.get("46-55") + 1);
+                else ageMap.put("56-65", ageMap.get("56-65") + 1);
+            }
+        }
+
+        // Role distribution
+        Map<String, Long> roleMap = new LinkedHashMap<>();
+        for (com.bloodbridge.entity.User u : users) {
+            if (u.getRole() != null) {
+                String r = u.getRole().name();
+                roleMap.put(r, roleMap.getOrDefault(r, 0L) + 1);
+            }
+        }
+
+        // Location distributions (Top 10 Cities and States)
+        Map<String, Long> cityMap = donors.stream()
+                .filter(dp -> dp.getCity() != null && !dp.getCity().isBlank())
+                .collect(Collectors.groupingBy(dp -> dp.getCity().trim(), Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(10)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+
+        Map<String, Long> stateMap = donors.stream()
+                .filter(dp -> dp.getState() != null && !dp.getState().isBlank())
+                .collect(Collectors.groupingBy(dp -> dp.getState().trim(), Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(10)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+
+        // Availability map
+        Map<String, Long> availMap = new LinkedHashMap<>();
+        availMap.put("Available", availableDonors);
+        availMap.put("Unavailable", Math.max(0, donorsCount - availableDonors));
+        availMap.put("Emergency Ready", emergencyAvailableDonors);
+
+        // Monthly trends (12 months)
+        List<Map<String, Object>> trendList = new ArrayList<>();
+        LocalDate now = LocalDate.now();
+        for (int i = 11; i >= 0; i--) {
+            LocalDate m = now.minusMonths(i);
+            String monthName = m.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + " " + m.getYear();
+            long count = users.stream()
+                    .filter(u -> u.getCreatedAt() != null &&
+                            u.getCreatedAt().getYear() == m.getYear() &&
+                            u.getCreatedAt().getMonthValue() == m.getMonthValue())
+                    .count();
+            Map<String, Object> t = new HashMap<>();
+            t.put("month", monthName);
+            t.put("Registrations", count);
+            trendList.add(t);
+        }
+
+        // Automated Real Insights
+        List<String> insights = new ArrayList<>();
+        if (!donors.isEmpty()) {
+            Map.Entry<String, Long> topBg = bloodGroupMap.entrySet().stream()
+                    .max(Map.Entry.comparingByValue()).orElse(null);
+            if (topBg != null && topBg.getValue() > 0) {
+                String bgFormatted = topBg.getKey().replace("_POSITIVE", "+").replace("_NEGATIVE", "-");
+                insights.add("Most common donor blood group: " + bgFormatted + " (" + topBg.getValue() + " donors)");
+            }
+            long availablePct = donorsCount > 0 ? Math.round(((double) availableDonors / donorsCount) * 100) : 0;
+            insights.add(availablePct + "% of registered donors are currently active & available for donation");
+            insights.add(cooldownDonors + " donors are currently in 90-day eligibility cooldown period");
+            if (!cityMap.isEmpty()) {
+                String topCity = cityMap.keySet().iterator().next();
+                insights.add("Most represented donor city: " + topCity + " (" + cityMap.get(topCity) + " donors)");
+            }
+        }
+
         return UserStatisticsResponse.builder()
                 .totalUsers(total)
-                .totalDonors(donors)
+                .totalDonors(donorsCount)
                 .totalPatients(patients)
                 .totalHospitals(hospitals)
                 .activeUsers(active)
                 .inactiveUsers(inactive)
+                .availableDonors(availableDonors)
+                .emergencyAvailableDonors(emergencyAvailableDonors)
+                .eligibleDonors(eligibleDonors)
+                .cooldownDonors(cooldownDonors)
+                .bloodGroupDistribution(bloodGroupMap)
+                .genderDistribution(genderMap)
+                .ageGroupDistribution(ageMap)
+                .roleDistribution(roleMap)
+                .locationCityDistribution(cityMap)
+                .locationStateDistribution(stateMap)
+                .availabilityDistribution(availMap)
+                .monthlyRegistrationTrends(trendList)
+                .automatedInsights(insights)
                 .build();
     }
 
@@ -167,19 +294,35 @@ public class DashboardServiceImpl implements DashboardService {
         }
 
         // Fill donor counts
-        List<Object[]> donorDistribution = donorProfileRepository.getBloodGroupDistribution();
-        for (Object[] row : donorDistribution) {
-            BloodGroup bg = (BloodGroup) row[0];
-            Long count = ((Number) row[1]).longValue();
-            donorMap.put(bg.name(), count);
+        try {
+            List<Object[]> donorDistribution = donorProfileRepository.getBloodGroupDistribution();
+            if (donorDistribution != null) {
+                for (Object[] row : donorDistribution) {
+                    if (row != null && row.length >= 2 && row[0] != null && row[1] != null) {
+                        String bgName = (row[0] instanceof BloodGroup) ? ((BloodGroup) row[0]).name() : row[0].toString();
+                        Long count = ((Number) row[1]).longValue();
+                        donorMap.put(bgName, count);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Error fetching donor blood group distribution: {}", e.getMessage());
         }
 
         // Fill request counts
-        List<Object[]> requestDistribution = bloodRequestRepository.getBloodGroupDistribution();
-        for (Object[] row : requestDistribution) {
-            BloodGroup bg = (BloodGroup) row[0];
-            Long count = ((Number) row[1]).longValue();
-            requestMap.put(bg.name(), count);
+        try {
+            List<Object[]> requestDistribution = bloodRequestRepository.getBloodGroupDistribution();
+            if (requestDistribution != null) {
+                for (Object[] row : requestDistribution) {
+                    if (row != null && row.length >= 2 && row[0] != null && row[1] != null) {
+                        String bgName = (row[0] instanceof BloodGroup) ? ((BloodGroup) row[0]).name() : row[0].toString();
+                        Long count = ((Number) row[1]).longValue();
+                        requestMap.put(bgName, count);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Error fetching request blood group distribution: {}", e.getMessage());
         }
 
         return BloodGroupAnalyticsResponse.builder()
@@ -204,14 +347,30 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     @Transactional(readOnly = true)
     public List<TopHospitalResponse> getTopHospitals() {
-        List<Object[]> queryResults = hospitalRepository.findTopHospitals(PageRequest.of(0, 10));
-        return queryResults.stream()
-                .map(row -> TopHospitalResponse.builder()
-                        .hospitalName((String) row[0])
-                        .totalRequests(((Number) row[1]).longValue())
-                        .totalDonations(((Number) row[2]).longValue())
-                        .build())
-                .collect(Collectors.toList());
+        log.info("Executing getTopHospitals query for analytics dashboard");
+        try {
+            List<Object[]> queryResults = hospitalRepository.findTopHospitals(PageRequest.of(0, 10));
+            if (queryResults == null || queryResults.isEmpty()) {
+                log.info("No top hospital metrics found in database, returning empty list");
+                return Collections.emptyList();
+            }
+
+            return queryResults.stream()
+                    .map(row -> {
+                        String name = (row != null && row.length > 0 && row[0] != null) ? row[0].toString() : "Registered Hospital";
+                        long reqCount = (row != null && row.length > 1 && row[1] != null) ? ((Number) row[1]).longValue() : 0L;
+                        long donCount = (row != null && row.length > 2 && row[2] != null) ? ((Number) row[2]).longValue() : 0L;
+                        return TopHospitalResponse.builder()
+                                .hospitalName(name)
+                                .totalRequests(reqCount)
+                                .totalDonations(donCount)
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Error executing getTopHospitals analytics query: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
     }
 
     @Override
@@ -318,5 +477,62 @@ public class DashboardServiceImpl implements DashboardService {
                 .notificationQueueStatus(queueStatus)
                 .apiHealth(dbConn)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.bloodbridge.dto.response.PushAnalyticsResponse getPushNotificationAnalytics() {
+        log.info("Executing getPushNotificationAnalytics query for admin analytics dashboard");
+        try {
+            long emailsSent = emailNotificationRepository.countByStatus(com.bloodbridge.enums.EmailDeliveryStatus.SENT);
+            long emailsFailed = emailNotificationRepository.countByStatus(com.bloodbridge.enums.EmailDeliveryStatus.FAILED);
+            long wsDelivered = notificationRepository.countByDeliveryChannel(com.bloodbridge.enums.DeliveryChannel.IN_APP);
+
+            long pushSent = pushDeliveryLogRepository.countByStatus("SENT");
+            long pushFailed = pushDeliveryLogRepository.countByStatus("FAILED");
+            long totalPush = pushSent + pushFailed;
+            double pushSuccessPct = totalPush > 0 ? ((double) pushSent / totalPush) * 100.0 : 100.0;
+
+            double avgLatency = pushDeliveryLogRepository.findAverageLatencyMs();
+            long retryCount = pushDeliveryLogRepository.findTotalRetryCount();
+            long invalidTokensRemoved = pushDeliveryLogRepository.countDistinctInvalidTokens();
+
+            Map<String, Long> topFailures = new LinkedHashMap<>();
+            List<Object[]> failureList = pushDeliveryLogRepository.findTopFailureReasons();
+            if (failureList != null) {
+                for (Object[] row : failureList) {
+                    if (row != null && row.length >= 2 && row[0] != null) {
+                        topFailures.put(row[0].toString(), ((Number) row[1]).longValue());
+                    }
+                }
+            }
+
+            return com.bloodbridge.dto.response.PushAnalyticsResponse.builder()
+                    .emailsSent(emailsSent)
+                    .emailsFailed(emailsFailed)
+                    .webSocketDelivered(wsDelivered)
+                    .pushSent(pushSent)
+                    .pushFailed(pushFailed)
+                    .pushSuccessPercentage(Math.round(pushSuccessPct * 10.0) / 10.0)
+                    .averagePushLatencyMs(Math.round(avgLatency * 10.0) / 10.0)
+                    .retryCount(retryCount)
+                    .invalidTokensRemoved(invalidTokensRemoved)
+                    .topFailureReasons(topFailures)
+                    .build();
+        } catch (Exception e) {
+            log.error("Error executing getPushNotificationAnalytics: {}", e.getMessage(), e);
+            return com.bloodbridge.dto.response.PushAnalyticsResponse.builder()
+                    .emailsSent(0L)
+                    .emailsFailed(0L)
+                    .webSocketDelivered(0L)
+                    .pushSent(0L)
+                    .pushFailed(0L)
+                    .pushSuccessPercentage(100.0)
+                    .averagePushLatencyMs(0.0)
+                    .retryCount(0L)
+                    .invalidTokensRemoved(0L)
+                    .topFailureReasons(Collections.emptyMap())
+                    .build();
+        }
     }
 }

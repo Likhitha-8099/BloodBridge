@@ -23,7 +23,10 @@ public class DonationSummaryResponse {
     private String donorName;
     private String patientName;
     private String hospitalName;
+    private com.bloodbridge.enums.BloodGroup bloodGroup;
     private LocalDate donationDate;
     private Integer unitsDonated;
     private DonationStatus status;
+    private String certificateId;
+    private Boolean certificateAvailable;
 }

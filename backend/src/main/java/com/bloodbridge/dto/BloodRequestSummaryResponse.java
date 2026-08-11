@@ -24,10 +24,19 @@ public class BloodRequestSummaryResponse {
 
     private Long id;
     private String patientName;
+    private String patientCity;
+    private String patientState;
     private String hospitalName;
+    private String hospitalAddress;
+    private String hospitalCity;
+    private String hospitalState;
+    private Double latitude;
+    private Double longitude;
     private BloodGroup bloodGroupNeeded;
     private Integer unitsRequired;
     private UrgencyLevel urgencyLevel;
+    private String reason;
+    private Double distanceKm;
     private LocalDate requiredByDate;
     private RequestStatus status;
 }

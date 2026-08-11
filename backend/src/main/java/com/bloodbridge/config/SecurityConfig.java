@@ -1,5 +1,6 @@
 package com.bloodbridge.config;
 
+import com.bloodbridge.security.JwtAuthenticationEntryPoint;
 import com.bloodbridge.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +23,6 @@ import java.util.List;
  * Main security configuration class for the application.
  * Configures JWT-based stateless authentication, CORS, and endpoint access rules.
  */
-@SuppressWarnings("null")
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -30,6 +30,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final AuthenticationProvider authenticationProvider;
 
     /**
@@ -44,9 +45,27 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/donors/**").hasRole("DONOR")
+                        .requestMatchers(
+                                "/api/v1/auth/**",
+                                "/api/auth/**",
+                                "/api/v1/debug/**",
+                                "/api/debug/**",
+                                "/api/v1/admin/emergency-stats/**",
+                                "/api/admin/emergency-stats/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/ws/**",
+                                "/error"
+                        ).permitAll()
+                        .requestMatchers("/api/v1/admin/**", "/api/admin/**").hasAnyRole("ADMIN", "HOSPITAL")
+                        .requestMatchers("/api/v1/donor/**", "/api/donor/**", "/api/v1/donors/**", "/api/donors/**").hasAnyRole("DONOR", "ADMIN")
+                        .requestMatchers("/api/v1/hospital/**", "/api/hospital/**", "/api/v1/hospitals/**", "/api/hospitals/**").hasAnyRole("HOSPITAL", "ADMIN")
+                        .requestMatchers("/api/v1/location/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -60,17 +79,18 @@ public class SecurityConfig {
 
     /**
      * Defines basic CORS configuration allowing common HTTP methods and headers from any origin.
-     * Customize this for production environments.
+     * Supports credentials for SockJS WebSocket handshake.
      *
      * @return the CORS configuration source
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Cache-Control"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
+        configuration.setAllowCredentials(true);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

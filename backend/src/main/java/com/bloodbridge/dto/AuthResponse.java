@@ -19,6 +19,9 @@ import java.util.Set;
 public class AuthResponse {
 
     private String token;
+    private String refreshToken;
+    @Builder.Default
+    private String tokenType = "Bearer";
     private String email;
     private Role role;
     private UserInfo user;
@@ -29,9 +32,12 @@ public class AuthResponse {
     @AllArgsConstructor
     @Builder
     public static class UserInfo {
+        private Long id;
         private String email;
         private String fullName;
+        private String phoneNumber;
         private Role role;
         private Set<Role> roles;
+        private Boolean active;
     }
 }

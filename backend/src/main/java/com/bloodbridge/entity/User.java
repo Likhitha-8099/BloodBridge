@@ -10,6 +10,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -60,9 +61,43 @@ public class User {
     @Builder.Default
     private Set<Role> roles = new java.util.HashSet<>();
 
+    @Column(name = "profile_image")
+    private String profileImage;
+
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "state")
+    private String state;
+
+    @Column(name = "country")
+    private String country;
+
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
+
+    @Builder.Default
+    @Column(name = "email_verified", nullable = false)
+    private Boolean emailVerified = false;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -71,6 +106,18 @@ public class User {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public Boolean getActive() {
+        return active != null ? active : true;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
 
     @PrePersist
     @PreUpdate

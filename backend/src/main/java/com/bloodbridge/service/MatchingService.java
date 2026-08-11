@@ -1,82 +1,52 @@
 package com.bloodbridge.service;
 
-import com.bloodbridge.dto.CompatibilityResponse;
-import com.bloodbridge.dto.DonorMatchResponse;
-import com.bloodbridge.dto.MatchResponse;
-import com.bloodbridge.dto.MatchingStatisticsResponse;
-import com.bloodbridge.entity.BloodRequest;
-import com.bloodbridge.entity.DonorProfile;
-import com.bloodbridge.enums.BloodGroup;
+import com.bloodbridge.dto.response.ApiResponse;
+import com.bloodbridge.dto.response.MatchDashboardResponse;
+import com.bloodbridge.dto.response.MatchResponse;
 
 import java.util.List;
 
 /**
- * Service interface for the Blood Matching Engine.
+ * Service interface for Intelligent Blood Matching & Allocation Engine workflows.
  */
 public interface MatchingService {
 
     /**
-     * Resolves compatible donor blood groups for a given blood group.
+     * Triggers the matching engine for a specific blood request, persists MatchResult entities, and returns top ranked matches.
      *
-     * @param bloodGroup the requested blood group
-     * @return the compatibility details
+     * @param bloodRequestId target blood request ID
+     * @return ApiResponse containing list of MatchResponse items
      */
-    CompatibilityResponse getCompatibleBloodGroups(BloodGroup bloodGroup);
+    ApiResponse<List<MatchResponse>> triggerMatching(Long bloodRequestId);
 
     /**
-     * Finds and ranks eligible, compatible donors for a verified blood request.
+     * Retrieves existing match results for a blood request ordered by rank.
      *
-     * @param requestId the request ID
-     * @return a list of ranked donor matches
+     * @param bloodRequestId blood request ID
+     * @return ApiResponse containing list of MatchResponse items
      */
-    List<DonorMatchResponse> findEligibleDonors(Long requestId);
+    ApiResponse<List<MatchResponse>> getMatchesByRequestId(Long bloodRequestId);
 
     /**
-     * Generates and persists match results for a verified request.
+     * Retrieves all match results across requests.
      *
-     * @param requestId the request ID
-     * @return the generated match results
+     * @return ApiResponse containing list of MatchResponse items
      */
-    List<MatchResponse> generateMatches(Long requestId);
+    ApiResponse<List<MatchResponse>> getAllMatches();
 
     /**
-     * Ranks a list of donors against a blood request based on score calculations.
+     * Recalculates and replaces matches for a blood request (e.g. when availability or request details change).
      *
-     * @param donors  the list of donors
-     * @param request the blood request
-     * @return ranked donor responses
+     * @param bloodRequestId blood request ID
+     * @return ApiResponse containing list of updated MatchResponse items
      */
-    List<DonorMatchResponse> rankDonors(List<DonorProfile> donors, BloodRequest request);
+    ApiResponse<List<MatchResponse>> recalculateMatches(Long bloodRequestId);
 
     /**
-     * Retrieves generated match results associated with a request.
+     * Retrieves hospital match dashboard overview for a blood request.
      *
-     * @param requestId the request ID
-     * @return the list of matches
+     * @param bloodRequestId blood request ID
+     * @return ApiResponse containing MatchDashboardResponse
      */
-    List<MatchResponse> getMatchesForRequest(Long requestId);
-
-    /**
-     * Retrieves match results assigned to a specific donor profile.
-     *
-     * @param donorId the donor profile ID
-     * @return the list of matches
-     */
-    List<MatchResponse> getMatchesForDonor(Long donorId);
-
-    /**
-     * Calculates the compatibility scoring for a donor profile relative to a blood request.
-     *
-     * @param donor   the donor profile
-     * @param request the blood request
-     * @return the calculated score points
-     */
-    Integer calculateCompatibilityScore(DonorProfile donor, BloodRequest request);
-
-    /**
-     * Retrieves overall aggregate matching statistics.
-     *
-     * @return match statistics
-     */
-    MatchingStatisticsResponse getMatchingStatistics();
+    ApiResponse<MatchDashboardResponse> getMatchDashboard(Long bloodRequestId);
 }
