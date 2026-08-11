@@ -8,8 +8,9 @@ backend/.mvn/wrapper/maven-wrapper.jar
 # ──── Frontend (Node / Vite) ────
 frontend/node_modules/
 frontend/dist/
-frontend/.env.local
-frontend/.env.*.local
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
 # ──── IDE / OS ────
 .vscode/settings.json
@@ -19,3 +20,17 @@ frontend/.env.*.local
 Thumbs.db
 *.class
 *.log
+
+# ──── Secrets / Environment Variables ────
+.env
+.env.local
+backend/.env
+backend/run-backend.ps1
+
+# ──── Firebase Credentials — Phase 3B ────
+# NEVER commit the Service Account JSON — it grants full Firebase Admin access.
+# Targeted rule: only ignores firebase-service-account.json anywhere in the tree.
+# This does NOT ignore package.json, package-lock.json, tsconfig.json, etc.
+backend/src/main/resources/firebase/firebase-service-account.json
+**/firebase-service-account.json
+*-adminsdk-*.json

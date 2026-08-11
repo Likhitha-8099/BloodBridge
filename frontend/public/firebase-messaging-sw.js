@@ -15,16 +15,9 @@
  *   - User is not actively using BloodBridge
  *
  * IMPORTANT: Service Workers run in a separate thread from the main page.
- * They do NOT have access to import.meta.env or Vite's module system.
- * Firebase config values MUST be hardcoded or injected via importScripts.
- *
- * ─────────────────────────────────────────────────────────────────────────────
- * MANUAL STEP REQUIRED:
- * After you add your Firebase credentials to frontend/.env, you MUST also
- * paste your firebaseConfig values into the self.firebaseConfig object below.
- * This is the only file where values appear directly — Service Workers cannot
- * use import.meta.env.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Configuration parameters are dynamically passed to the Service Worker via URL
+ * query parameters when registered by the main application in firebase-messaging.js.
+ * This avoids hardcoding secrets or API keys in tracked source files.
  */
 
 // ── Step 1: Import Firebase scripts via CDN ──────────────────────────────
@@ -34,23 +27,17 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
 
 // ── Step 2: Firebase configuration ───────────────────────────────────────
-// MANUAL: Paste your Firebase config values here after getting them from
-// Firebase Console → Project Settings → General → Your apps → Web app config
-//
-// These values match what you put in frontend/.env but are needed separately
-// because Service Workers cannot access import.meta.env or process.env.
-//
-// ⚠ NOTE: These values are NOT secret — they are public client-side keys
-// that Firebase uses to identify your app. The actual security is enforced
-// by Firebase Security Rules and your backend.
+// Extract configuration parameters dynamically from self.location.search.
+// The main application passes VITE_FIREBASE_* environment variables during SW registration.
+const params = new URLSearchParams(self.location.search);
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyB-qyrOqjA1Zky_rXnHjtj5UVzPHgRlKHY',
-  authDomain: 'bloodbridge-12b62.firebaseapp.com',
-  projectId: 'bloodbridge-12b62',
-  storageBucket: 'bloodbridge-12b62.firebasestorage.app',
-  messagingSenderId: '908018823527',
-  appId: '1:908018823527:web:0a4be5067951be60253fc2',
+  apiKey: params.get('apiKey') || '',
+  authDomain: params.get('authDomain') || '',
+  projectId: params.get('projectId') || '',
+  storageBucket: params.get('storageBucket') || '',
+  messagingSenderId: params.get('messagingSenderId') || '',
+  appId: params.get('appId') || '',
 };
 // ── Step 3: Initialize Firebase in the Service Worker context ─────────────
 if (firebaseConfig.apiKey && firebaseConfig.apiKey.trim() !== '') {
@@ -117,11 +104,10 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey.trim() !== '') {
 
   console.log('[SW-Firebase] ✔ Firebase Messaging Service Worker initialized.');
 } else {
-  // Config not yet filled in — log warning but do not throw
+  // Config not yet set — log warning but do not throw
   console.warn(
-    '[SW-Firebase] ⚠ Firebase config is empty in firebase-messaging-sw.js.\n' +
-    'After pasting your Firebase credentials into frontend/.env,\n' +
-    'also paste them into the firebaseConfig object in public/firebase-messaging-sw.js.\n' +
-    'Background notifications will not work until this is done.'
+    '[SW-Firebase] ⚠ Firebase config is empty or missing from URL query parameters.\n' +
+    'Ensure VITE_FIREBASE_* environment variables are configured in frontend/.env.\n' +
+    'Background notifications will not work until values are set.'
   );
 }
