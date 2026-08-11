@@ -11,7 +11,8 @@ export function useDonorProfile() {
     queryKey: ['donorProfile'],
     queryFn: async () => {
       try {
-        return await donorService.getProfile();
+        const res = await donorService.getProfile();
+        return res?.data ?? res;
       } catch (error) {
         if (error.message.includes('404') || error.message.toLowerCase().includes('not found')) {
           return null;
@@ -26,6 +27,7 @@ export function useDonorProfile() {
     mutationFn: donorService.createProfile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['donorProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['emergencyBloodRequests'] });
     },
   });
 
@@ -33,6 +35,7 @@ export function useDonorProfile() {
     mutationFn: donorService.updateProfile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['donorProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['emergencyBloodRequests'] });
     },
   });
 
@@ -40,6 +43,7 @@ export function useDonorProfile() {
     mutationFn: donorService.updateAvailability,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['donorProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['emergencyBloodRequests'] });
     },
   });
 

@@ -11,15 +11,15 @@ export default function StatCard({
   iconColor = 'text-primary bg-red-50' 
 }) {
   return (
-    <Card className="flex items-center gap-4">
+    <Card className="flex items-center gap-4 hover:shadow-md transition-shadow">
       {Icon && (
-        <div className={`p-4 rounded-2xl ${iconColor} shrink-0`}>
+        <div className={`p-3.5 rounded-2xl ${iconColor} shrink-0`}>
           <Icon className="h-6 w-6" />
         </div>
       )}
       <div>
-        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{title}</span>
-        <h3 className="text-2xl font-black text-gray-900 mt-0.5">{value}</h3>
+        <span className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase tracking-wider">{title}</span>
+        <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{value ?? 0}</h3>
       </div>
     </Card>
   );

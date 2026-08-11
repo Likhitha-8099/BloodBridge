@@ -3,16 +3,30 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useRequestDetails } from '../../hooks/useRequestDetails';
 import { useHospitalProfile } from '../../hooks/useHospitalProfile';
 import { useHospitalRequests } from '../../hooks/useHospitalRequests';
-import Card from '../../components/ui/Card';
-import StatusBadge from '../../components/ui/StatusBadge';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
-import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorState from '../../components/ui/ErrorState';
-import { ArrowLeft, CheckCircle2, Ban, AlertCircle, ShieldCheck, Heart, User } from 'lucide-react';
+import HospitalPageHeader from '../../components/hospital/common/HospitalPageHeader';
+import HospitalCard from '../../components/hospital/common/HospitalCard';
+import HospitalStatusBadge from '../../components/hospital/common/HospitalStatusBadge';
+import EmergencyRequestResponses from '../../components/hospital/HospitalDashboard/EmergencyRequestResponses';
+import { 
+  ArrowLeft, 
+  CheckCircle2, 
+  Ban, 
+  AlertCircle, 
+  ShieldCheck, 
+  Heart, 
+  User, 
+  Droplet,
+  Calendar,
+  Building,
+  Activity
+} from 'lucide-react';
 
 /**
- * Detailed screen showing transfusion request requirements, patient context, and hospital verification triggers.
+ * Detailed Request View for Hospital Portal.
+ * Modern healthcare portal design preserving 100% of existing verification/rejection APIs and hooks.
  */
 export default function RequestDetails() {
   const { id } = useParams();
@@ -20,7 +34,7 @@ export default function RequestDetails() {
   const { data: request, isLoading, error, refetch } = useRequestDetails(id);
   const { profile } = useHospitalProfile();
   const { verifyRequest, rejectRequest, isVerifying, isRejecting } = useHospitalRequests();
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -29,7 +43,7 @@ export default function RequestDetails() {
   }
 
   if (error) {
-    return <ErrorState message={error.message} onRetry={refetch} />;
+    return <ErrorState message={error.message || 'Failed to load request details.'} onRetry={refetch} />;
   }
 
   if (!request) {
@@ -66,128 +80,154 @@ export default function RequestDetails() {
     });
   };
 
+  const formatBloodGroup = (bg) => {
+    if (!bg) return 'N/A';
+    return bg.replace('_POSITIVE', '+').replace('_NEGATIVE', '-');
+  };
+
   const isMyHospital = profile && request.hospitalName === profile.hospitalName;
   const isPending = request.status === 'PENDING';
   const isVerified = ['VERIFIED', 'MATCHED', 'COMPLETED'].includes(request.status);
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 justify-between flex-wrap">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-6 pb-12 font-sans">
+      <HospitalPageHeader
+        title={`Transfusion Request #${request.id}`}
+        subtitle={`Clinical Specifications & Verification Panel for ${request.patientName || 'Emergency Patient'}`}
+        icon={Activity}
+        badge={request.status}
+        breadcrumbs={[
+          { label: 'Blood Requests', to: '/hospital/requests' },
+          { label: `Request #${request.id}` }
+        ]}
+        action={
           <button
             onClick={() => navigate('/hospital/requests')}
-            className="p-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 rounded-xl shadow-sm transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-xs hover:bg-slate-50 transition-all"
           >
             <ArrowLeft className="h-4 w-4" />
+            <span>Back to Requests</span>
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Request #{request.id}</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Assigned to: {request.hospitalName}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <StatusBadge status={request.status} />
-        </div>
-      </div>
+        }
+      />
 
       {actionError && (
-        <div className="flex items-start gap-2 bg-red-50 text-red-600 p-3.5 rounded-xl text-xs border border-red-100 font-medium">
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 p-4 rounded-2xl text-xs border border-red-100 dark:border-red-900/40 font-medium">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <span>{actionError}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Side: Detail specifications */}
-        <div className="md:col-span-2 flex flex-col gap-6">
-          <Card className="flex flex-col gap-4">
-            <h3 className="font-bold text-gray-800 text-sm border-b border-gray-50 pb-2 flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" /> Patient & Transfusion Info
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Patient Name</span>
-                <span className="font-bold text-gray-800">{request.patientName}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Specifications */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          <HospitalCard
+            title="Transfusion Requirements & Patient Info"
+            subtitle="Clinical details provided during request creation"
+            icon={User}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 py-2">
+              <div className="flex flex-col gap-1 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Patient Name</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white">{request.patientName || 'N/A'}</span>
               </div>
 
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Blood Group Needed</span>
-                <span className="font-extrabold text-gray-800 text-base">
-                  {request.bloodGroupNeeded 
-                    ? request.bloodGroupNeeded.replace('_POSITIVE', '+').replace('_NEGATIVE', '-') 
-                    : 'N/A'}
+              <div className="flex flex-col gap-1 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Blood Group Needed</span>
+                <span className="inline-flex items-center gap-1.5 font-black text-base text-red-600 dark:text-red-400">
+                  <Droplet className="h-4 w-4 fill-current" />
+                  {formatBloodGroup(request.bloodGroupNeeded)}
                 </span>
               </div>
 
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Units Required</span>
-                <span className="font-bold text-gray-800">{request.unitsRequired} Bags</span>
+              <div className="flex flex-col gap-1 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Units Required</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white">{request.unitsRequired} Units</span>
               </div>
 
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Urgency Level</span>
-                <span className="font-bold text-gray-800">{request.urgencyLevel}</span>
+              <div className="flex flex-col gap-1 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Urgency Level</span>
+                <div>
+                  <HospitalStatusBadge status={request.urgencyLevel} type="urgency" />
+                </div>
               </div>
 
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Required By Date</span>
-                <span className="font-bold text-gray-800">{formatDate(request.requiredByDate)}</span>
+              <div className="flex flex-col gap-1 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 sm:col-span-2">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Assigned Hospital</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Building className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  {request.hospitalName}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 sm:col-span-2">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Required By Date</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  {formatDate(request.requiredByDate)}
+                </span>
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5 mt-2 bg-slate-50 p-4 rounded-xl border border-gray-100">
-              <span className="text-xs font-semibold text-gray-700">Patient Clinical Reason</span>
-              <p className="text-xs text-gray-500 leading-relaxed mt-0.5">
-                {request.reason || 'No clinical reason provided.'}
+            <div className="mt-4 p-4 rounded-2xl bg-teal-50/50 dark:bg-teal-950/30 border border-teal-100 dark:border-teal-900/40">
+              <span className="text-xs font-bold text-teal-900 dark:text-teal-200">Patient Clinical Reason</span>
+              <p className="text-xs text-teal-800/80 dark:text-teal-300/80 leading-relaxed mt-1">
+                {request.reason || 'No specific clinical notes provided.'}
               </p>
             </div>
-          </Card>
+          </HospitalCard>
+
+          {/* Matched Donor Feed */}
+          <EmergencyRequestResponses requestId={request.id} />
         </div>
 
-        {/* Right Side Actions panel */}
+        {/* Right Column: Actions Panel */}
         <div className="flex flex-col gap-6">
-          {isMyHospital && (
-            <Card className="flex flex-col gap-4">
-              <h3 className="font-bold text-gray-800 text-sm pb-1">Verification Action Panel</h3>
+          <HospitalCard
+            title="Verification Action Panel"
+            subtitle="Clinical verification triggers"
+            icon={ShieldCheck}
+          >
+            {isMyHospital && isPending ? (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleVerify}
+                  disabled={isVerifying}
+                  className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>{isVerifying ? 'Verifying...' : 'Verify Request'}</span>
+                </button>
 
-              {isPending ? (
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="primary"
-                    onClick={handleVerify}
-                    isLoading={isVerifying}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-xs"
-                  >
-                    <CheckCircle2 className="h-4 w-4" /> Verify Request
-                  </Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => setIsModalOpen(true)}
-                    isLoading={isRejecting}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-xs"
-                  >
-                    <Ban className="h-4 w-4" /> Reject Request
-                  </Button>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  disabled={isRejecting}
+                  className="w-full py-3 px-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-md shadow-red-600/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Ban className="h-4 w-4" />
+                  <span>{isRejecting ? 'Rejecting...' : 'Reject Request'}</span>
+                </button>
+              </div>
+            ) : isVerified ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-start gap-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 p-4 rounded-2xl text-xs border border-emerald-100 dark:border-emerald-900/40 font-medium">
+                  <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                  <span>This request is verified. You can now execute donor matching compatibility routines.</span>
                 </div>
-              ) : isVerified ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-2 bg-green-50 text-green-700 p-3 rounded-xl text-xs border border-green-100 font-medium">
-                    <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
-                    <span>This request is verified. You can now execute donor matching compatibility routines.</span>
-                  </div>
-                  <Link to={`/hospital/matches?requestId=${request.id}`} className="w-full">
-                    <Button variant="primary" className="w-full flex items-center justify-center gap-2 py-2.5 text-xs">
-                      <Heart className="h-4 w-4" /> Run Matching Engine
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400">No actions can be performed on this request.</p>
-              )}
-            </Card>
-          )}
+
+                <Link to={`/hospital/matches?requestId=${request.id}`} className="w-full">
+                  <button className="w-full py-3 px-4 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2">
+                    <Heart className="h-4 w-4" />
+                    <span>Run Matching Engine</span>
+                  </button>
+                </Link>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center py-4">
+                No verification actions available for this request.
+              </p>
+            )}
+          </HospitalCard>
         </div>
       </div>
 

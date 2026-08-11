@@ -6,8 +6,7 @@ import donationService from '../services/donationService';
  */
 export function useDonationHistory(donorId) {
   return useQuery({
-    queryKey: ['donationHistory', donorId],
+    queryKey: ['donationHistory', donorId || 'me'],
     queryFn: () => donationService.getDonationHistory(donorId),
-    enabled: !!donorId,
   });
 }

@@ -9,15 +9,15 @@ export const adminService = {
    */
   getDashboardOverview: async () => {
     const response = await api.get('/admin/dashboard');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
-   * Retrieves detailed user registration metrics.
+   * Retrieves detailed user registration metrics & demographics.
    */
   getUserStatistics: async () => {
     const response = await api.get('/admin/statistics/users');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -25,7 +25,7 @@ export const adminService = {
    */
   getRequestStatistics: async () => {
     const response = await api.get('/admin/statistics/requests');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -33,7 +33,7 @@ export const adminService = {
    */
   getDonationStatistics: async () => {
     const response = await api.get('/admin/statistics/donations');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -41,7 +41,7 @@ export const adminService = {
    */
   getMatchingStatistics: async () => {
     const response = await api.get('/admin/statistics/matching');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -49,7 +49,7 @@ export const adminService = {
    */
   getNotificationStatistics: async () => {
     const response = await api.get('/admin/statistics/notifications');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -57,7 +57,7 @@ export const adminService = {
    */
   getBloodGroupAnalytics: async () => {
     const response = await api.get('/admin/analytics/blood-groups');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -65,7 +65,7 @@ export const adminService = {
    */
   getTopDonors: async () => {
     const response = await api.get('/admin/analytics/top-donors');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -73,7 +73,7 @@ export const adminService = {
    */
   getTopHospitals: async () => {
     const response = await api.get('/admin/analytics/top-hospitals');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -81,7 +81,7 @@ export const adminService = {
    */
   getMonthlyDonations: async () => {
     const response = await api.get('/admin/analytics/monthly-donations');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -89,15 +89,25 @@ export const adminService = {
    */
   getMonthlyRequests: async () => {
     const response = await api.get('/admin/analytics/monthly-requests');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
-   * Retrieves database and queue status.
+   * Retrieves pending hospital registrations for review.
    */
-  getSystemHealth: async () => {
-    const response = await api.get('/admin/system-health');
-    return response.data;
+  getPendingHospitals: async () => {
+    const response = await api.get('/admin/hospitals/pending');
+    return response.data?.data ?? response.data;
+  },
+
+  /**
+   * Verifies, approves, or rejects a hospital registration.
+   */
+  verifyHospital: async (id, status, remarks = 'Admin Review') => {
+    const response = await api.patch(`/admin/hospitals/${id}/verify`, null, {
+      params: { status, remarks }
+    });
+    return response.data?.data ?? response.data;
   },
 };
 

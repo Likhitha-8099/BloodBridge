@@ -83,17 +83,6 @@ export function useTopHospitals() {
 }
 
 /**
- * Hook to retrieve system health diagnostics.
- */
-export function useSystemHealth() {
-  return useQuery({
-    queryKey: ['adminSystemHealth'],
-    queryFn: adminService.getSystemHealth,
-    refetchInterval: 15000,
-  });
-}
-
-/**
  * Hook to retrieve system notification statistics.
  */
 export function useNotificationStatistics() {

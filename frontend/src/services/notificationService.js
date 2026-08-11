@@ -9,7 +9,11 @@ export const notificationService = {
    */
   getNotifications: async () => {
     const response = await api.get('/notifications');
-    return response.data;
+    const resData = response.data?.data !== undefined ? response.data.data : response.data;
+    if (Array.isArray(resData)) return resData;
+    if (resData?.notifications && Array.isArray(resData.notifications)) return resData.notifications;
+    if (resData?.items && Array.isArray(resData.items)) return resData.items;
+    return [];
   },
 
   /**
@@ -17,7 +21,15 @@ export const notificationService = {
    */
   getUnreadNotifications: async () => {
     const response = await api.get('/notifications/unread');
-    return response.data;
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Retrieves unread & total notification count metrics.
+   */
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread-count');
+    return response.data?.data || response.data || { unreadCount: 0, totalCount: 0 };
   },
 
   /**
@@ -25,7 +37,7 @@ export const notificationService = {
    */
   getNotificationById: async (id) => {
     const response = await api.get(`/notifications/${id}`);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   /**
@@ -33,7 +45,23 @@ export const notificationService = {
    */
   markAsRead: async (id) => {
     const response = await api.patch(`/notifications/${id}/read`);
-    return response.data;
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Marks all notifications for authenticated user as read.
+   */
+  markAllAsRead: async () => {
+    const response = await api.patch('/notifications/read-all');
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Deletes a notification by ID.
+   */
+  deleteNotification: async (id) => {
+    const response = await api.delete(`/notifications/${id}`);
+    return response.data?.data || response.data;
   },
 };
 

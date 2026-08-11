@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { usePatientProfile } from '../../hooks/usePatientProfile';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -11,7 +11,6 @@ import { Edit3, User, Info, PhoneCall } from 'lucide-react';
  * Profile view page displaying patient specifics and emergency contact details.
  */
 export default function PatientProfile() {
-  const navigate = useNavigate();
   const { profile, isLoading, error, refetch } = usePatientProfile();
 
   if (isLoading) {

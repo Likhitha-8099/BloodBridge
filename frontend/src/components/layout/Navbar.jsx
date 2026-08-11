@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { LogOut, Heart, User, Menu, ChevronDown } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import NotificationBell from '../ui/NotificationBell';
 import ThemeToggle from '../ui/ThemeToggle';
-import { authService } from '../../services/authService';
+import BloodBridgeLogo from '../common/BloodBridgeLogo';
 
 /**
  * Global Header Navbar displaying platform branding, dark theme toggle, notifications, and mobile hamburger controls.
@@ -33,8 +33,13 @@ export default function Navbar({ onMenuToggle }) {
   const handleRoleSwitch = async (newRole) => {
     try {
       const response = await authService.switchRole(newRole);
-      login(response.token, response.role, response.user);
-      navigate(`/${response.role.toLowerCase()}/dashboard`);
+      // Unwrap ApiResponse<AuthResponse> wrapper if present
+      const authData = response?.data ?? response;
+      const { token, role: switchedRole, user: switchedUser } = authData;
+      if (token && switchedRole) {
+        login(token, switchedRole, switchedUser);
+        navigate(`/${switchedRole.toLowerCase()}/dashboard`);
+      }
       setIsDropdownOpen(false);
     } catch (err) {
       console.error('Failed to switch role:', err);
@@ -63,11 +68,8 @@ export default function Navbar({ onMenuToggle }) {
             <Menu className="h-5 w-5" />
           </button>
         )}
-        <Link to="/" className="flex items-center gap-2">
-          <Heart className="h-6 w-6 text-primary fill-primary" />
-          <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">
-            Blood<span className="text-primary">Bridge</span>
-          </span>
+        <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+          <BloodBridgeLogo size="md" />
         </Link>
       </div>
       

@@ -13,6 +13,19 @@ export const requestService = {
   },
 
   /**
+   * Fetches blood requests for the authenticated hospital.
+   */
+  getHospitalRequests: async () => {
+    try {
+      const response = await api.get('/hospital/blood-requests');
+      return response.data?.data || response.data;
+    } catch {
+      const response = await api.get('/requests/active');
+      return response.data;
+    }
+  },
+
+  /**
    * Hospital verifies a blood request.
    */
   verifyRequest: async (requestId) => {

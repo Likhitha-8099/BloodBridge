@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useHospitalProfile } from '../../hooks/useHospitalProfile';
-import Card from '../../components/ui/Card';
-import Input from '../../components/ui/Input';
-import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
-import { Save, ArrowLeft, AlertCircle } from 'lucide-react';
+import HospitalPageHeader from '../../components/hospital/common/HospitalPageHeader';
+import HospitalCard from '../../components/hospital/common/HospitalCard';
+import LoginInput from '../../components/auth/LoginInput';
+import { Save, ArrowLeft, AlertCircle, Building } from 'lucide-react';
 
 /**
- * Screen enabling hospitals to configure profile details.
+ * Edit Hospital Profile Screen for Hospital Module.
+ * Modern healthcare portal design preserving 100% of existing profile hooks and form validation.
  */
 export default function EditHospitalProfile() {
   const navigate = useNavigate();
@@ -70,96 +71,114 @@ export default function EditHospitalProfile() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate('/hospital/profile')}
-          className="p-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 rounded-xl shadow-sm transition-all"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">
-            {profile ? 'Edit Profile' : 'Create Hospital Profile'}
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Configure license details, addresses, and contact details of your hospital.
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6 pb-12 font-sans max-w-3xl mx-auto">
+      <HospitalPageHeader
+        title={profile ? 'Edit Hospital Profile' : 'Configure Hospital Profile'}
+        subtitle="Configure institution license details, contact numbers, and physical facility address."
+        icon={Building}
+        badge="Settings"
+        breadcrumbs={[
+          { label: 'Hospital Profile', to: '/hospital/profile' },
+          { label: 'Edit Profile' }
+        ]}
+        action={
+          <button
+            onClick={() => navigate('/hospital/profile')}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-xs hover:bg-slate-50 transition-all"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Cancel</span>
+          </button>
+        }
+      />
 
       {errorMsg && (
-        <div className="flex items-start gap-2 bg-red-50 text-red-600 p-3.5 rounded-xl text-xs border border-red-100 font-medium">
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 p-4 rounded-2xl text-xs border border-red-100 dark:border-red-900/40 font-medium">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      <Card>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+      <HospitalCard bodyClassName="p-6 sm:p-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
+            <LoginInput
               label="Hospital Name"
               type="text"
-              placeholder="e.g. City General Hospital"
+              placeholder="e.g. City Multi-Speciality Hospital"
               error={errors.hospitalName?.message}
               {...register('hospitalName', { required: 'Hospital name is required' })}
             />
 
-            <Input
-              label="Registration Number"
+            <LoginInput
+              label="Registration / License Number"
               type="text"
-              placeholder="e.g. REG-12345"
+              placeholder="e.g. HOSP-REG-98765"
               error={errors.registrationNumber?.message}
               {...register('registrationNumber', { required: 'Registration number is required' })}
             />
 
-            <Input
-              label="Contact Email Address"
+            <LoginInput
+              label="Official Contact Email"
               type="email"
-              placeholder="e.g. bloodbank@citygeneral.com"
+              placeholder="hospital@medical.org"
               error={errors.email?.message}
               {...register('email', { required: 'Contact email is required' })}
             />
 
-            <Input
-              label="Contact Phone Number"
+            <LoginInput
+              label="Emergency Phone Number"
               type="text"
-              placeholder="e.g. +16175551234"
+              placeholder="e.g. +91 9876543210"
               error={errors.phoneNumber?.message}
               {...register('phoneNumber', { required: 'Contact phone number is required' })}
             />
 
-            <Input
-              label="Street Address"
-              type="text"
-              placeholder="e.g. 100 Medical Way"
-              error={errors.address?.message}
-              {...register('address', { required: 'Street address is required' })}
-            />
+            <div className="sm:col-span-2">
+              <LoginInput
+                label="Street Address & Area"
+                type="text"
+                placeholder="e.g. 100 Healthcare Boulevard, Suite 4"
+                error={errors.address?.message}
+                {...register('address', { required: 'Street address is required' })}
+              />
+            </div>
 
-            <Input
+            <LoginInput
               label="City"
               type="text"
-              placeholder="e.g. Boston"
+              placeholder="e.g. Hyderabad"
               error={errors.city?.message}
               {...register('city', { required: 'City is required' })}
             />
 
-            <Input
+            <LoginInput
               label="State"
               type="text"
-              placeholder="e.g. MA"
+              placeholder="e.g. Telangana"
               error={errors.state?.message}
               {...register('state', { required: 'State is required' })}
             />
           </div>
 
-          <Button type="submit" variant="primary" isLoading={isSubmitting} className="w-full sm:w-fit self-end mt-4 px-6">
-            <Save className="h-4 w-4 mr-2" /> Save Profile
-          </Button>
+          <div className="flex items-center justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-2xl shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2"
+            >
+              {isSubmitting ? (
+                <span>Saving Profile...</span>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Save Hospital Profile</span>
+                </>
+              )}
+            </button>
+          </div>
         </form>
-      </Card>
+      </HospitalCard>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export function useHospitalRequests() {
 
   const requestsQuery = useQuery({
     queryKey: ['hospitalRequests'],
-    queryFn: requestService.getActiveRequests,
+    queryFn: requestService.getHospitalRequests,
   });
 
   const verifyMutation = useMutation({

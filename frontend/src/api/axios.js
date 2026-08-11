@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8083/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -28,9 +28,18 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       useAuthStore.getState().logout();
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
-    return Promise.reject(new Error(errorMessage));
+    const err = new Error(errorMessage);
+    if (error.response) {
+      err.response = error.response;
+      err.data = error.response.data;
+      err.errors = error.response.data?.errors;
+    }
+    return Promise.reject(err);
   }
 );
 
