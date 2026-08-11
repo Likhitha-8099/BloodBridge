@@ -27,10 +27,10 @@ export default function NotificationAnalytics() {
   ].filter(n => n.value > 0);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 font-sans">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Notification Channels Analytics</h1>
-        <p className="text-xs text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Notification Channels Analytics</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Audit notification dispatch rates, delivery channel logs, and queue states.
         </p>
       </div>
@@ -40,25 +40,25 @@ export default function NotificationAnalytics() {
           title="Total Notifications"
           value={stats?.totalNotifications}
           icon={Bell}
-          iconColor="text-blue-500 bg-blue-50"
+          iconColor="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60"
         />
         <StatCard
           title="Sent Alerts"
           value={stats?.sentNotifications}
           icon={CheckCircle}
-          iconColor="text-green-500 bg-green-50"
+          iconColor="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60"
         />
         <StatCard
           title="Failed Alerts"
           value={stats?.failedNotifications}
           icon={ShieldAlert}
-          iconColor="text-red-500 bg-red-50"
+          iconColor="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60"
         />
         <StatCard
           title="Unread Alerts"
           value={stats?.unreadNotifications}
           icon={Clock}
-          iconColor="text-yellow-500 bg-yellow-50"
+          iconColor="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60"
         />
       </div>
 
@@ -67,7 +67,7 @@ export default function NotificationAnalytics() {
           {notificationData.length > 0 ? (
             <PieChartCard title="Delivery Status Distribution" data={notificationData} />
           ) : (
-            <div className="h-64 flex items-center justify-center border rounded-3xl text-xs text-gray-400 bg-white">
+            <div className="h-64 flex items-center justify-center border border-slate-100 dark:border-slate-800 rounded-3xl text-xs text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
               No notification transactions logged.
             </div>
           )}

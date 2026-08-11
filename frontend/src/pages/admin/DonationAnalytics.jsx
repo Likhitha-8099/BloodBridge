@@ -38,10 +38,10 @@ export default function DonationAnalytics() {
   })) : [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 font-sans">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Donation Tracking & Analytics</h1>
-        <p className="text-xs text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Donation Tracking & Analytics</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Check donation completion rates, active schedule slots, and monthly fulfillment trends.
         </p>
       </div>
@@ -51,25 +51,25 @@ export default function DonationAnalytics() {
           title="Total Donations"
           value={stats?.totalDonations}
           icon={Activity}
-          iconColor="text-blue-500 bg-blue-50"
+          iconColor="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60"
         />
         <StatCard
           title="Completed Donations"
           value={stats?.completedDonations}
           icon={CheckSquare}
-          iconColor="text-green-500 bg-green-50"
+          iconColor="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60"
         />
         <StatCard
           title="Pending Appointments"
           value={stats?.pendingDonations}
           icon={Clock}
-          iconColor="text-yellow-500 bg-yellow-50"
+          iconColor="text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/60"
         />
         <StatCard
           title="Cancelled Runs"
           value={stats?.cancelledDonations}
           icon={XSquare}
-          iconColor="text-red-500 bg-red-50"
+          iconColor="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60"
         />
       </div>
 
@@ -84,7 +84,7 @@ export default function DonationAnalytics() {
             color="#10B981" 
           />
         ) : (
-          <div className="h-64 flex items-center justify-center border rounded-3xl text-xs text-gray-400 bg-white">
+          <div className="h-64 flex items-center justify-center border border-slate-100 dark:border-slate-800 rounded-3xl text-xs text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
             No trend data available.
           </div>
         )}
@@ -99,7 +99,7 @@ export default function DonationAnalytics() {
             color="#E11D48" 
           />
         ) : (
-          <div className="h-64 flex items-center justify-center border rounded-3xl text-xs text-gray-400 bg-white">
+          <div className="h-64 flex items-center justify-center border border-slate-100 dark:border-slate-800 rounded-3xl text-xs text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
             No blood group metrics registered.
           </div>
         )}

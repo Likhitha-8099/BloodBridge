@@ -12,7 +12,8 @@ export const authService = {
    */
   login: async (credentials) => {
     const response = await api.post('/auth/login', credentials);
-    return response.data;
+    // Backend wraps all responses in ApiResponse<T>: { success, message, data: AuthResponse }
+    return response.data?.data ?? response.data;
   },
 
   /**

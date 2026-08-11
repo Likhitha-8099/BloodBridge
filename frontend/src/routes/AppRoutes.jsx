@@ -1,12 +1,14 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import ProtectedRoute from './ProtectedRoute';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
-// Lazy load Pages
+// Lazy load Auth Pages
 const Home = lazy(() => import('../pages/Home'));
-const Login = lazy(() => import('../pages/auth/Login'));
+const DonorLogin = lazy(() => import('../pages/auth/DonorLogin'));
+const HospitalLogin = lazy(() => import('../pages/auth/HospitalLogin'));
+const AdminLogin = lazy(() => import('../pages/auth/AdminLogin'));
 const Register = lazy(() => import('../pages/auth/Register'));
 
 // Donor Pages
@@ -15,6 +17,9 @@ const DonorProfile = lazy(() => import('../pages/donor/DonorProfile'));
 const EditDonorProfile = lazy(() => import('../pages/donor/EditDonorProfile'));
 const BloodRequests = lazy(() => import('../pages/donor/BloodRequests'));
 const DonationHistory = lazy(() => import('../pages/donor/DonationHistory'));
+const DonorImpactDashboard = lazy(() => import('../pages/donor/DonorImpactDashboard'));
+const DonorEligibility = lazy(() => import('../pages/donor/DonorEligibility'));
+const DonorAiAssistant = lazy(() => import('../pages/donor/DonorAiAssistant'));
 
 // Patient Pages
 const PatientDashboard = lazy(() => import('../pages/patient/PatientDashboard'));
@@ -32,6 +37,9 @@ const HospitalRequests = lazy(() => import('../pages/hospital/BloodRequests'));
 const HospitalRequestDetails = lazy(() => import('../pages/hospital/RequestDetails'));
 const DonorMatches = lazy(() => import('../pages/hospital/DonorMatches'));
 const DonationManagement = lazy(() => import('../pages/hospital/DonationManagement'));
+const HospitalUsers = lazy(() => import('../pages/hospital/HospitalUsers'));
+const HospitalDonors = lazy(() => import('../pages/hospital/HospitalDonors'));
+const HospitalAiAssistant = lazy(() => import('../pages/hospital/HospitalAiAssistant'));
 
 // Admin Pages
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
@@ -41,7 +49,7 @@ const DonationAnalytics = lazy(() => import('../pages/admin/DonationAnalytics'))
 const MatchingAnalytics = lazy(() => import('../pages/admin/MatchingAnalytics'));
 const HospitalAnalytics = lazy(() => import('../pages/admin/HospitalAnalytics'));
 const NotificationAnalytics = lazy(() => import('../pages/admin/NotificationAnalytics'));
-const SystemHealth = lazy(() => import('../pages/admin/SystemHealth'));
+const AdminProfile = lazy(() => import('../pages/admin/AdminProfile'));
 
 // Notifications
 const NotificationCenter = lazy(() => import('../pages/notifications/NotificationCenter'));
@@ -51,6 +59,8 @@ const NotificationDetails = lazy(() => import('../pages/notifications/Notificati
 const NotFoundPage = lazy(() => import('../pages/ErrorPages').then(module => ({ default: module.NotFoundPage })));
 const ForbiddenPage = lazy(() => import('../pages/ErrorPages').then(module => ({ default: module.ForbiddenPage })));
 const ServerErrorPage = lazy(() => import('../pages/ErrorPages').then(module => ({ default: module.ServerErrorPage })));
+const HospitalAuth = lazy(() => import('../pages/auth/HospitalAuth'));
+const HospitalRegister = lazy(() => import('../pages/auth/HospitalRegister'));
 
 /**
  * Global Routing System definitions mapping endpoints to UI views with route-based chunk splitting.
@@ -61,8 +71,14 @@ export default function AppRoutes() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/auth/hospital" element={<HospitalAuth />} />
+        <Route path="/login" element={<DonorLogin />} />
+        <Route path="/login/donor" element={<DonorLogin />} />
+        <Route path="/login/hospital" element={<HospitalLogin />} />
+        <Route path="/login/admin" element={<AdminLogin />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/register/donor" element={<Register />} />
+        <Route path="/register/hospital" element={<HospitalRegister />} />
 
         {/* Protected Routes nested in MainLayout */}
         <Route element={<MainLayout />}>
@@ -73,6 +89,9 @@ export default function AppRoutes() {
             <Route path="/donor/profile/edit" element={<EditDonorProfile />} />
             <Route path="/donor/requests" element={<BloodRequests />} />
             <Route path="/donor/history" element={<DonationHistory />} />
+            <Route path="/donor/impact" element={<DonorImpactDashboard />} />
+            <Route path="/donor/eligibility" element={<DonorEligibility />} />
+            <Route path="/donor/ai-assistant" element={<DonorAiAssistant />} />
           </Route>
 
           {/* Patient Protected Area */}
@@ -90,10 +109,15 @@ export default function AppRoutes() {
             <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
             <Route path="/hospital/profile" element={<HospitalProfile />} />
             <Route path="/hospital/profile/edit" element={<EditHospitalProfile />} />
+            <Route path="/hospital/create-request" element={<CreateBloodRequest />} />
+            <Route path="/hospital/requests/create" element={<CreateBloodRequest />} />
             <Route path="/hospital/requests" element={<HospitalRequests />} />
             <Route path="/hospital/requests/:id" element={<HospitalRequestDetails />} />
+            <Route path="/hospital/users" element={<HospitalUsers />} />
+            <Route path="/hospital/donors" element={<HospitalDonors />} />
             <Route path="/hospital/matches" element={<DonorMatches />} />
             <Route path="/hospital/donations" element={<DonationManagement />} />
+            <Route path="/hospital/ai-assistant" element={<HospitalAiAssistant />} />
           </Route>
 
           {/* Admin Protected Area */}
@@ -105,7 +129,7 @@ export default function AppRoutes() {
             <Route path="/admin/matching" element={<MatchingAnalytics />} />
             <Route path="/admin/hospitals" element={<HospitalAnalytics />} />
             <Route path="/admin/notifications" element={<NotificationAnalytics />} />
-            <Route path="/admin/system-health" element={<SystemHealth />} />
+            <Route path="/admin/profile" element={<AdminProfile />} />
           </Route>
 
           {/* Unified Notifications Area */}

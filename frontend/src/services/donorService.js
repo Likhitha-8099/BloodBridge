@@ -9,7 +9,7 @@ export const donorService = {
    */
   getProfile: async () => {
     const response = await api.get('/donors/me');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -17,7 +17,7 @@ export const donorService = {
    */
   createProfile: async (profileData) => {
     const response = await api.post('/donors', profileData);
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -25,7 +25,7 @@ export const donorService = {
    */
   updateProfile: async (profileData) => {
     const response = await api.put('/donors/me', profileData);
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -33,7 +33,7 @@ export const donorService = {
    */
   updateAvailability: async (availableForDonation) => {
     const response = await api.patch('/donors/availability', { availableForDonation });
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 };
 

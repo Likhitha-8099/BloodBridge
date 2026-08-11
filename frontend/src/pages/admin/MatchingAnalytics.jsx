@@ -29,10 +29,10 @@ export default function MatchingAnalytics() {
   ].filter(s => s.value > 0);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 font-sans">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Compatibility Matching Engine Analytics</h1>
-        <p className="text-xs text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Compatibility Matching Engine Analytics</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Audit the matching algorithm performance, dispatch rates, and accept ratios.
         </p>
       </div>
@@ -42,31 +42,31 @@ export default function MatchingAnalytics() {
           title="Total Matches Run"
           value={stats?.totalMatches}
           icon={Activity}
-          iconColor="text-blue-500 bg-blue-50"
+          iconColor="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60"
         />
         <StatCard
           title="Accepted Matches"
           value={stats?.acceptedMatches}
           icon={CheckCircle}
-          iconColor="text-green-500 bg-green-50"
+          iconColor="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60"
         />
         <StatCard
           title="Rejected Matches"
           value={stats?.rejectedMatches}
           icon={ShieldAlert}
-          iconColor="text-red-500 bg-red-50"
+          iconColor="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60"
         />
         <StatCard
           title="Active Matches"
           value={stats?.activeMatches}
           icon={ShieldCheck}
-          iconColor="text-indigo-500 bg-indigo-50"
+          iconColor="text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60"
         />
         <StatCard
           title="Matching Success Rate"
           value={`${successRate}%`}
           icon={Activity}
-          iconColor="text-teal-500 bg-teal-50"
+          iconColor="text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60"
         />
       </div>
 
@@ -75,7 +75,7 @@ export default function MatchingAnalytics() {
           {matchStatusData.length > 0 ? (
             <PieChartCard title="Matching Status Results" data={matchStatusData} />
           ) : (
-            <div className="h-64 flex items-center justify-center border rounded-3xl text-xs text-gray-405 bg-white">
+            <div className="h-64 flex items-center justify-center border border-slate-100 dark:border-slate-800 rounded-3xl text-xs text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900">
               No matching run status data recorded.
             </div>
           )}

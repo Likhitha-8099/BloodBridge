@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useDonorProfile } from '../../hooks/useDonorProfile';
 import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
+import ToggleSwitch from '../../components/ui/ToggleSwitch';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
-import { Save, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Save, ArrowLeft, AlertCircle, Stethoscope, MapPin, Bell, User } from 'lucide-react';
 
 /**
- * Page view allowing users to create or edit their donor profiles.
+ * Edit Donor Profile Screen for viewing and updating healthcare attributes.
  */
 export default function EditDonorProfile() {
   const navigate = useNavigate();
@@ -21,18 +22,47 @@ export default function EditDonorProfile() {
     register, 
     handleSubmit, 
     reset, 
-    formState: { errors } 
+    control,
+    watch,
+    formState: { errors, isValid } 
   } = useForm({
+    mode: 'onChange',
     defaultValues: {
-      bloodGroup: '',
-      age: '',
-      gender: '',
+      fullName: '',
+      email: '',
+      phoneNumber: '',
+      bloodGroup: 'O_POSITIVE',
+      age: 25,
+      gender: 'MALE',
+      dateOfBirth: '',
       city: '',
       state: '',
-      weight: '',
+      country: 'India',
+      district: '',
+      postalCode: '',
+      address: '',
+      weight: 65,
+      height: 175,
+      hemoglobin: 14.0,
+      bloodPressure: '120/80',
+      pulseRate: 72,
       medicalConditions: '',
+      currentMedications: '',
+      allergies: '',
       lastDonationDate: '',
+      emergencyAvailable: true,
       availableForDonation: true,
+      smoking: false,
+      alcohol: false,
+      drugUsage: false,
+      recentSurgery: false,
+      recentTattoo: false,
+      recentVaccination: false,
+      willingDonatePlatelets: true,
+      willingDonatePlasma: true,
+      rareBloodDonor: false,
+      pushNotificationEnabled: true,
+      preferredDonationRadius: 25
     }
   });
 
@@ -40,15 +70,41 @@ export default function EditDonorProfile() {
   useEffect(() => {
     if (profile) {
       reset({
-        bloodGroup: profile.bloodGroup || '',
-        age: profile.age || '',
-        gender: profile.gender || '',
+        fullName: profile.fullName || '',
+        email: profile.email || '',
+        phoneNumber: profile.phoneNumber || '',
+        bloodGroup: profile.bloodGroup || 'O_POSITIVE',
+        age: profile.age || 25,
+        gender: profile.gender || 'MALE',
+        dateOfBirth: profile.dateOfBirth || '',
         city: profile.city || '',
         state: profile.state || '',
-        weight: profile.weight || '',
+        country: profile.country || 'India',
+        district: profile.district || '',
+        postalCode: profile.postalCode || '',
+        address: profile.address || '',
+        weight: profile.weight || 65,
+        height: profile.height || 175,
+        hemoglobin: profile.hemoglobin || 14.0,
+        bloodPressure: profile.bloodPressure || '120/80',
+        pulseRate: profile.pulseRate || 72,
         medicalConditions: profile.medicalConditions || '',
+        currentMedications: profile.currentMedications || '',
+        allergies: profile.allergies || '',
         lastDonationDate: profile.lastDonationDate || '',
-        availableForDonation: profile.availableForDonation !== undefined ? profile.availableForDonation : true,
+        emergencyAvailable: profile.emergencyAvailable ?? true,
+        availableForDonation: profile.availableForDonation ?? true,
+        smoking: profile.smoking ?? false,
+        alcohol: profile.alcohol ?? false,
+        drugUsage: profile.drugUsage ?? false,
+        recentSurgery: profile.recentSurgery ?? false,
+        recentTattoo: profile.recentTattoo ?? false,
+        recentVaccination: profile.recentVaccination ?? false,
+        willingDonatePlatelets: profile.willingDonatePlatelets ?? true,
+        willingDonatePlasma: profile.willingDonatePlasma ?? true,
+        rareBloodDonor: profile.rareBloodDonor ?? false,
+        pushNotificationEnabled: profile.pushNotificationEnabled ?? true,
+        preferredDonationRadius: profile.preferredDonationRadius || 25
       });
     }
   }, [profile, reset]);
@@ -65,6 +121,9 @@ export default function EditDonorProfile() {
         ...data,
         age: parseInt(data.age, 10),
         weight: parseFloat(data.weight),
+        height: data.height ? parseFloat(data.height) : null,
+        hemoglobin: data.hemoglobin ? parseFloat(data.hemoglobin) : null,
+        pulseRate: data.pulseRate ? parseInt(data.pulseRate, 10) : null,
         lastDonationDate: data.lastDonationDate ? data.lastDonationDate : null,
       };
 
@@ -82,159 +141,159 @@ export default function EditDonorProfile() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-3xl mx-auto font-sans">
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate('/donor/profile')}
-          className="p-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 rounded-xl shadow-sm transition-all"
+          className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-slate-500 rounded-xl shadow-xs transition-all"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">
-            {profile ? 'Edit Profile' : 'Create Donor Profile'}
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            {profile ? 'Edit Donor Health Profile' : 'Create Donor Profile'}
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Provide medical details and location info for donor eligibility matching.
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+            Update your medical parameters, location, and donation preferences.
           </p>
         </div>
       </div>
 
       {errorMsg && (
-        <div className="flex items-start gap-2 bg-red-50 text-red-600 p-3.5 rounded-xl text-xs border border-red-100 font-medium">
+        <div className="flex items-start gap-2 bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 p-4 rounded-2xl text-xs border border-red-100 font-medium">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      <Card>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Blood Group Selection */}
-            <div className="flex flex-col gap-1.5 w-full">
-              <label className="text-xs font-semibold text-gray-600 tracking-wide">Blood Group</label>
-              <select
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-0 ${
-                  errors.bloodGroup
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-100 bg-red-50/10'
-                    : 'border-gray-200 focus:border-primary focus:ring-red-100'
-                } bg-white text-gray-900`}
-                {...register('bloodGroup', { required: 'Blood Group selection is required' })}
-              >
-                <option value="">Select...</option>
-                <option value="A_POSITIVE">A+ (A Positive)</option>
-                <option value="A_NEGATIVE">A- (A Negative)</option>
-                <option value="B_POSITIVE">B+ (B Positive)</option>
-                <option value="B_NEGATIVE">B- (B Negative)</option>
-                <option value="AB_POSITIVE">AB+ (AB Positive)</option>
-                <option value="AB_NEGATIVE">AB- (AB Negative)</option>
-                <option value="O_POSITIVE">O+ (O Positive)</option>
-                <option value="O_NEGATIVE">O- (O Negative)</option>
-              </select>
-              {errors.bloodGroup && <span className="text-[11px] text-red-500 font-medium pl-1">{errors.bloodGroup.message}</span>}
+      <Card className="p-6 sm:p-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
+          {/* SECTION 0: Identity & Contact Info */}
+          <div className="space-y-4">
+            <h3 className="font-bold text-sm text-gray-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" /> Identity & Contact Information
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Input 
+                label="Full Name *" 
+                placeholder="John Doe" 
+                error={errors.fullName?.message} 
+                {...register('fullName', { required: 'Full Name is required' })} 
+              />
+              <Input 
+                label="Email Address *" 
+                type="email" 
+                placeholder="donor@example.com" 
+                error={errors.email?.message} 
+                {...register('email', { 
+                  required: 'Email is required', 
+                  pattern: { value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, message: 'Please enter a valid email' } 
+                })} 
+              />
+              <Input 
+                label="Phone Number" 
+                placeholder="+91 9876543210" 
+                {...register('phoneNumber')} 
+              />
             </div>
+          </div>
 
-            {/* Age Validation */}
-            <Input
-              label="Age"
-              type="number"
-              placeholder="e.g. 28"
-              error={errors.age?.message}
-              {...register('age', {
-                required: 'Age is required',
-                min: { value: 18, message: 'Must be at least 18 years old' },
-                max: { value: 65, message: 'Must be at most 65 years old' }
-              })}
-            />
+          {/* SECTION 1: Vitals & Blood Group */}
+          <div className="space-y-4">
+            <h3 className="font-bold text-sm text-gray-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+              <Stethoscope className="h-4 w-4 text-primary" /> Medical Parameters & Vitals
+            </h3>
 
-            {/* Gender Selection */}
-            <div className="flex flex-col gap-1.5 w-full">
-              <label className="text-xs font-semibold text-gray-600 tracking-wide">Gender</label>
-              <select
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-0 ${
-                  errors.gender
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-100 bg-red-50/10'
-                    : 'border-gray-200 focus:border-primary focus:ring-red-100'
-                } bg-white text-gray-900`}
-                {...register('gender', { required: 'Gender selection is required' })}
-              >
-                <option value="">Select...</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-              </select>
-              {errors.gender && <span className="text-[11px] text-red-500 font-medium pl-1">{errors.gender.message}</span>}
-            </div>
-
-            {/* Weight Validation */}
-            <Input
-              label="Weight (kg)"
-              type="number"
-              step="0.1"
-              placeholder="e.g. 68.5"
-              error={errors.weight?.message}
-              {...register('weight', {
-                required: 'Weight is required',
-                min: { value: 45, message: 'Weight must be at least 45 kg' }
-              })}
-            />
-
-            {/* Location Fields */}
-            <Input
-              label="City"
-              type="text"
-              placeholder="e.g. Los Angeles"
-              error={errors.city?.message}
-              {...register('city', { required: 'City name is required' })}
-            />
-
-            <Input
-              label="State"
-              type="text"
-              placeholder="e.g. CA"
-              error={errors.state?.message}
-              {...register('state', { required: 'State code/name is required' })}
-            />
-
-            {/* Last Donation Date Selector */}
-            <Input
-              label="Last Donation Date (Optional)"
-              type="date"
-              error={errors.lastDonationDate?.message}
-              {...register('lastDonationDate')}
-            />
-
-            {/* Availability Checkbox */}
-            <div className="flex flex-col gap-1.5 w-full justify-center">
-              <span className="text-xs font-semibold text-gray-600 tracking-wide">Availability Status</span>
-              <div className="flex items-center gap-2 py-2">
-                <input
-                  type="checkbox"
-                  id="availableForDonation"
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  {...register('availableForDonation')}
-                />
-                <label htmlFor="availableForDonation" className="text-sm font-semibold text-gray-700 select-none">
-                  Available immediately for donation matches
-                </label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-gray-600 dark:text-slate-400">Blood Group</label>
+                <select className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-800 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white font-bold" {...register('bloodGroup')}>
+                  <option value="O_POSITIVE">O+</option>
+                  <option value="O_NEGATIVE">O-</option>
+                  <option value="A_POSITIVE">A+</option>
+                  <option value="A_NEGATIVE">A-</option>
+                  <option value="B_POSITIVE">B+</option>
+                  <option value="B_NEGATIVE">B-</option>
+                  <option value="AB_POSITIVE">AB+</option>
+                  <option value="AB_NEGATIVE">AB-</option>
+                </select>
               </div>
+
+              <Input label="Age" type="number" error={errors.age?.message} {...register('age', { required: 'Age is required' })} />
+              <Input label="Height (cm)" type="number" {...register('height')} />
+              <Input label="Weight (kg)" type="number" step="0.1" error={errors.weight?.message} {...register('weight', { required: 'Weight is required' })} />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Input label="Hemoglobin (g/dL)" type="number" step="0.1" {...register('hemoglobin')} />
+              <Input label="Blood Pressure (mmHg)" placeholder="120/80" {...register('bloodPressure')} />
+              <Input label="Pulse Rate (bpm)" type="number" {...register('pulseRate')} />
             </div>
           </div>
 
-          {/* Medical Conditions Textarea */}
-          <div className="flex flex-col gap-1.5 w-full">
-            <label className="text-xs font-semibold text-gray-600 tracking-wide">
-              Medical Conditions / Allergies (Optional)
-            </label>
-            <textarea
-              rows={3}
-              placeholder="List any medical situations, diseases, or allergy histories. Leave blank if none."
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-red-100 bg-white text-gray-900 placeholder-gray-400"
-              {...register('medicalConditions')}
-            />
+          {/* SECTION 2: Address & Location */}
+          <div className="space-y-4">
+            <h3 className="font-bold text-sm text-gray-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" /> Location & Residence
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Input label="City" error={errors.city?.message} {...register('city', { required: 'City required' })} />
+              <Input label="State" error={errors.state?.message} {...register('state', { required: 'State required' })} />
+              <Input label="PIN Code" {...register('postalCode')} />
+            </div>
+            <Input label="Full Address" {...register('address')} />
           </div>
 
-          <Button type="submit" variant="primary" isLoading={isSubmitting} className="w-full sm:w-fit self-end mt-4 px-6">
-            <Save className="h-4 w-4 mr-2" /> Save Profile
+          {/* SECTION 3: Fixed Toggle Switches */}
+          <div className="space-y-4">
+            <h3 className="font-bold text-sm text-gray-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+              <Bell className="h-4 w-4 text-primary" /> Lifestyle & Preference Toggles
+            </h3>
+
+            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              <Controller control={control} name="availableForDonation" render={({ field }) => (
+                <ToggleSwitch label="General Availability" sublabel="Available for donation requests" checked={field.value} onChange={field.onChange} />
+              )} />
+
+              <Controller control={control} name="emergencyAvailable" render={({ field }) => (
+                <ToggleSwitch label="Emergency Availability" sublabel="Urgent SMS/Push call alerts" checked={field.value} onChange={field.onChange} />
+              )} />
+
+              <Controller control={control} name="smoking" render={({ field }) => (
+                <ToggleSwitch label="Smoking Habits" sublabel="Tobacco smoker" checked={field.value} onChange={field.onChange} />
+              )} />
+
+              <Controller control={control} name="alcohol" render={({ field }) => (
+                <ToggleSwitch label="Alcohol Intake" sublabel="Regular alcohol intake" checked={field.value} onChange={field.onChange} />
+              )} />
+
+              <Controller control={control} name="willingDonatePlatelets" render={({ field }) => (
+                <ToggleSwitch label="Donate Platelets" sublabel="Platelet apheresis" checked={field.value} onChange={field.onChange} />
+              )} />
+
+              <Controller control={control} name="willingDonatePlasma" render={({ field }) => (
+                <ToggleSwitch label="Donate Plasma" sublabel="Plasma donation" checked={field.value} onChange={field.onChange} />
+              )} />
+
+              <Controller control={control} name="rareBloodDonor" render={({ field }) => (
+                <ToggleSwitch label="Rare Blood Type Registry" sublabel="Listed on rare blood roster" checked={field.value} onChange={field.onChange} />
+              )} />
+
+              <Controller control={control} name="pushNotificationEnabled" render={({ field }) => (
+                <ToggleSwitch label="Push Notifications" sublabel="Receive alerts on device" checked={field.value} onChange={field.onChange} />
+              )} />
+            </div>
+          </div>
+
+          <Button 
+            type="submit" 
+            variant="primary" 
+            isLoading={isSubmitting} 
+            disabled={!isValid || Boolean(errors.email) || !watch('email')}
+            className="w-full sm:w-fit self-end px-8 font-bold"
+          >
+            <Save className="h-4 w-4 mr-2" /> Save Profile Parameters
           </Button>
         </form>
       </Card>
