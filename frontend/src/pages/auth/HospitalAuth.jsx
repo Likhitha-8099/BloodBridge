@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import Card from '../../components/ui/Card';
@@ -11,11 +11,17 @@ import { LogIn, UserPlus, ArrowLeft, ShieldCheck } from 'lucide-react';
  * Displays exclusively two choices: Hospital Registration and Hospital Login.
  */
 export default function HospitalAuth() {
-  const { isAuthenticated, role } = useAuthStore();
+  const { isAuthenticated, role, logout } = useAuthStore();
 
-  if (isAuthenticated && role) {
-    const dashboardPath = `/${role.toLowerCase()}/dashboard`;
-    return <Navigate to={dashboardPath} replace />;
+  // Clear previous module authentication if navigating from Donor or Admin
+  useEffect(() => {
+    if (isAuthenticated && role !== 'HOSPITAL') {
+      logout();
+    }
+  }, [isAuthenticated, role, logout]);
+
+  if (isAuthenticated && role === 'HOSPITAL') {
+    return <Navigate to="/hospital/dashboard" replace />;
   }
 
   return (

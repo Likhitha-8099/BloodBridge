@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
@@ -26,11 +26,18 @@ import {
  * Strictly preserves existing authentication, routing, and backend functionality.
  */
 export default function Home() {
-  const { isAuthenticated, role } = useAuthStore();
+  const { isAuthenticated, role, logout } = useAuthStore();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [selectedGroup, setSelectedGroup] = useState('B+');
+
+  // When returning to the Home page, reset previous module session so user is not accidentally kept logged in across modules
+  useEffect(() => {
+    if (isAuthenticated) {
+      logout();
+    }
+  }, [isAuthenticated, logout]);
 
   // Smooth section scroll
   const scrollToSection = (id) => {

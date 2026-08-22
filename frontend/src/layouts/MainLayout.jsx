@@ -4,7 +4,7 @@ import HospitalHeader from '../components/hospital/HospitalHeader';
 import DonorHeader from '../components/donor/DonorHeader';
 import AdminHeader from '../components/admin/AdminHeader';
 import Sidebar from '../components/layout/Sidebar';
-import { Outlet, NavLink, Link } from 'react-router-dom';
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useUnreadNotifications } from '../hooks/useNotifications';
 import BloodBridgeLogo from '../components/common/BloodBridgeLogo';
@@ -77,6 +77,7 @@ const HOSPITAL_NAV = [
  * Hospital, Donor, and Admin roles receive dedicated headers and themed mobile drawers.
  */
 export default function MainLayout() {
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { role, user, logout } = useAuthStore();
   const isHospital = role === 'HOSPITAL';
@@ -99,8 +100,7 @@ export default function MainLayout() {
 
   const handleHospitalLogout = () => {
     logout();
-    // We can't use useNavigate here (not inside JSX), so we use window location
-    window.location.href = '/login';
+    navigate('/', { replace: true });
   };
 
   const getLinks = () => {

@@ -122,7 +122,7 @@ export default function DonorHeader({ onMenuToggle }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   // ── Page info ───────────────────────────────────────────────────────────────

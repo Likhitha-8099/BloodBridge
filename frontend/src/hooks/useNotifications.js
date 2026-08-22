@@ -1,14 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import notificationService from '../services/notificationService';
+import { useAuthStore } from '../store/authStore';
 
 /**
  * Custom hook to retrieve all notifications for the authenticated user with 20s polling interval.
  */
 export function useNotifications() {
+  const token = useAuthStore((state) => state.token);
   return useQuery({
     queryKey: ['notifications'],
     queryFn: notificationService.getNotifications,
-    refetchInterval: 20000,
+    enabled: !!token,
+    refetchInterval: token ? 20000 : false,
   });
 }
 
@@ -16,10 +19,12 @@ export function useNotifications() {
  * Custom hook to retrieve unread notifications with 20s polling interval.
  */
 export function useUnreadNotifications() {
+  const token = useAuthStore((state) => state.token);
   return useQuery({
     queryKey: ['unreadNotifications'],
     queryFn: notificationService.getUnreadNotifications,
-    refetchInterval: 20000,
+    enabled: !!token,
+    refetchInterval: token ? 20000 : false,
   });
 }
 
@@ -27,10 +32,12 @@ export function useUnreadNotifications() {
  * Custom hook to retrieve unread notification count with 20s polling interval.
  */
 export function useUnreadCount() {
+  const token = useAuthStore((state) => state.token);
   return useQuery({
     queryKey: ['unreadCount'],
     queryFn: notificationService.getUnreadCount,
-    refetchInterval: 20000,
+    enabled: !!token,
+    refetchInterval: token ? 20000 : false,
   });
 }
 

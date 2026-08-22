@@ -109,6 +109,66 @@ export const adminService = {
     });
     return response.data?.data ?? response.data;
   },
+
+  /**
+   * Retrieves all registered donors with optional filtering.
+   */
+  getAllDonors: async (params = {}) => {
+    const response = await api.get('/admin/donors', { params });
+    return response.data?.data ?? response.data;
+  },
+
+  /**
+   * Retrieves complete profile details for a specific donor ID.
+   */
+  getDonorById: async (id) => {
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Donor ID is missing.');
+    }
+    const response = await api.get(`/admin/donors/${id}`);
+    return response.data?.data ?? response.data;
+  },
+
+  /**
+   * Permanently deletes a donor profile, user account, and associated data.
+   */
+  deleteDonor: async (donorId) => {
+    if (donorId === undefined || donorId === null || donorId === 'undefined' || donorId === 'null') {
+      throw new Error('Unable to delete donor: donor ID is missing.');
+    }
+    const response = await api.delete(`/admin/donors/${donorId}`);
+    return response.data?.data ?? response.data;
+  },
+
+  /**
+   * Retrieves all registered hospitals with optional filtering.
+   */
+  getAllHospitals: async (params = {}) => {
+    const response = await api.get('/admin/hospitals', { params });
+    return response.data?.data ?? response.data;
+  },
+
+  /**
+   * Retrieves complete profile details for a specific hospital ID.
+   */
+  getHospitalById: async (id) => {
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Hospital ID is missing.');
+    }
+    const response = await api.get(`/admin/hospitals/${id}`);
+    return response.data?.data ?? response.data;
+  },
+
+  /**
+   * Permanently deletes a hospital profile, user account, and associated data.
+   */
+  deleteHospital: async (hospitalId) => {
+    if (hospitalId === undefined || hospitalId === null || hospitalId === 'undefined' || hospitalId === 'null') {
+      throw new Error('Unable to delete hospital: hospital ID is missing.');
+    }
+    const response = await api.delete(`/admin/hospitals/${hospitalId}`);
+    return response.data?.data ?? response.data;
+  },
 };
 
 export default adminService;
