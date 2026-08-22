@@ -1,36 +1,48 @@
-# Blood Bridge - Root .gitignore
+# Blood Bridge - Production-Ready Root .gitignore
 
 # ──── Backend (Maven / Spring Boot) ────
 backend/target/
+target/
 backend/*.log
+*.log
 backend/.mvn/wrapper/maven-wrapper.jar
+backend/src/main/resources/application-local.properties
+backend/src/main/resources/application-secret.properties
 
 # ──── Frontend (Node / Vite) ────
 frontend/node_modules/
+node_modules/
 frontend/dist/
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
+dist/
 
 # ──── IDE / OS ────
-.vscode/settings.json
+.vscode/
 .idea/
 *.iml
 .DS_Store
 Thumbs.db
 *.class
-*.log
 
-# ──── Secrets / Environment Variables ────
+# ──── Secrets & Environment Variables ────
 .env
+.env.*
 .env.local
 backend/.env
+backend/.env.*
 backend/run-backend.ps1
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+*.pem
+*.key
 
-# ──── Firebase Credentials — Phase 3B ────
-# NEVER commit the Service Account JSON — it grants full Firebase Admin access.
-# Targeted rule: only ignores firebase-service-account.json anywhere in the tree.
-# This does NOT ignore package.json, package-lock.json, tsconfig.json, etc.
+# Preserve example configuration templates
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# ──── Firebase / GCP Service Account Credentials ────
 backend/src/main/resources/firebase/firebase-service-account.json
 **/firebase-service-account.json
 *-adminsdk-*.json
+

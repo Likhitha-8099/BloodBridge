@@ -133,7 +133,8 @@ export const registerServiceWorker = async () => {
   const swUrl = `/firebase-messaging-sw.js?${params.toString()}`;
 
   try {
-    const registration = await navigator.serviceWorker.register(swUrl);
+    const registration = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+    await navigator.serviceWorker.ready;
     console.info('[FCM] ✔ Service Worker registered with dynamic configuration.');
     return registration;
   } catch (err) {
