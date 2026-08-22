@@ -27,7 +27,7 @@ export default function Navbar({ onMenuToggle }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   const handleRoleSwitch = async (newRole) => {

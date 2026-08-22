@@ -10,9 +10,12 @@ import DataTable from '../../components/ui/DataTable';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorState from '../../components/ui/ErrorState';
 import Button from '../../components/ui/Button';
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import useToastStore from '../../store/toastStore';
+import adminService from '../../services/adminService';
 import { 
   Users, User, Heart, Award, Wifi, WifiOff, Download, 
-  Search, ShieldCheck, Zap, Lightbulb, MapPin, Activity
+  Search, ShieldCheck, Zap, Lightbulb, MapPin, Activity, Trash2
 } from 'lucide-react';
 
 /**
@@ -33,10 +36,16 @@ export default function UserManagement() {
     refetchDonors();
   });
 
+  const { addToast } = useToastStore();
+
   // Table Filters State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('ALL');
   const [selectedBloodGroup, setSelectedBloodGroup] = useState('ALL');
+
+  // Delete Donor State
+  const [selectedDonorToDelete, setSelectedDonorToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isLoading = isStatsLoading || isDonorsLoading;
   const error = statsError || donorsError;
@@ -123,8 +132,9 @@ export default function UserManagement() {
   const filteredDonors = useMemo(() => {
     return donorList.filter(row => {
       const searchLower = searchQuery.toLowerCase();
+      const donorDisplayName = row.donorName || row.fullName || row.name || row.userName || row.user?.fullName || row.user?.name || '';
       const matchesSearch = !searchQuery || 
-        (row.fullName && row.fullName.toLowerCase().includes(searchLower)) ||
+        (donorDisplayName && donorDisplayName.toLowerCase().includes(searchLower)) ||
         (row.email && row.email.toLowerCase().includes(searchLower)) ||
         (row.city && row.city.toLowerCase().includes(searchLower));
 
@@ -142,7 +152,7 @@ export default function UserManagement() {
     if (!filteredDonors || filteredDonors.length === 0) return;
     const headers = ['Donor Name', 'Email', 'Role', 'Blood Group', 'City', 'State', 'Donations Count'];
     const rows = filteredDonors.map(row => [
-      `"${row.fullName || row.name || ''}"`,
+      `"${row.donorName || row.fullName || row.name || row.userName || row.user?.fullName || ''}"`,
       `"${row.email || ''}"`,
       `"${row.role || 'DONOR'}"`,
       `"${(row.bloodGroup || 'N/A').replace('_POSITIVE', '+').replace('_NEGATIVE', '-')}"`,
@@ -160,6 +170,38 @@ export default function UserManagement() {
     document.body.removeChild(link);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!selectedDonorToDelete) return;
+    const donorId = selectedDonorToDelete.donorId ?? selectedDonorToDelete.id ?? selectedDonorToDelete.userId;
+    const donorName = selectedDonorToDelete.donorName || selectedDonorToDelete.fullName || selectedDonorToDelete.name || selectedDonorToDelete.email || 'Donor';
+
+    console.log('[DELETE DONOR] Selected donor:', selectedDonorToDelete);
+    console.log('[DELETE DONOR] Donor ID:', donorId);
+
+    // Frontend validation: prevent firing request if donor ID is missing or invalid
+    if (donorId === undefined || donorId === null || donorId === 'undefined' || donorId === 'null') {
+      console.error('[DELETE DONOR ERROR] Unable to delete donor: donor ID is missing.', selectedDonorToDelete);
+      addToast('Unable to delete donor: donor ID is missing.', 'error');
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      console.log(`[DELETE DONOR] Calling DELETE /api/v1/admin/donors/${donorId} for ${donorName}`);
+      await adminService.deleteDonor(donorId);
+      addToast(`Donor ${donorName} permanently deleted successfully.`, 'success');
+      setSelectedDonorToDelete(null);
+      refetchStats();
+      refetchDonors();
+    } catch (err) {
+      console.error('Failed to delete donor:', err);
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to delete donor. Please try again.';
+      addToast(errMsg, 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return <LoadingSpinner fullScreen />;
   }
@@ -171,18 +213,27 @@ export default function UserManagement() {
   const donorTableColumns = [
     {
       header: 'User / Donor Name',
-      field: 'fullName',
-      render: (row) => (
-        <div className="flex flex-col">
-          <span className="font-bold text-slate-800 dark:text-white">{row.fullName || row.name || 'Registered User'}</span>
-          <span className="text-[11px] text-slate-400 font-mono">{row.email}</span>
-        </div>
-      )
+      field: 'donorName',
+      render: (row) => {
+        const displayName = row.donorName || row.fullName || row.name || row.userName || row.user?.fullName || row.user?.name || 'Registered User';
+        return (
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-900 dark:text-white text-sm tracking-tight transition-colors duration-150">
+              {displayName}
+            </span>
+            {row.email && (
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                {row.email}
+              </span>
+            )}
+          </div>
+        );
+      }
     },
     {
       header: 'Blood Group',
       render: (row) => (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-200 dark:border-red-800">
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300 border border-red-200 dark:border-red-800">
           {(row.bloodGroup || 'N/A').replace('_POSITIVE', '+').replace('_NEGATIVE', '-')}
         </span>
       )
@@ -190,7 +241,7 @@ export default function UserManagement() {
     {
       header: 'Role',
       render: (row) => (
-        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase">
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase border border-slate-200/60 dark:border-slate-700">
           {row.role || 'DONOR'}
         </span>
       )
@@ -199,7 +250,7 @@ export default function UserManagement() {
       header: 'City & State',
       render: (row) => (
         <span className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
-          <MapPin className="h-3 w-3 text-slate-400" />
+          <MapPin className="h-3 w-3 text-slate-400 dark:text-slate-500" />
           {row.city || 'N/A'}{row.state ? `, ${row.state}` : ''}
         </span>
       )
@@ -210,6 +261,22 @@ export default function UserManagement() {
         <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs">
           {row.donationCount ?? row.totalDonations ?? 0} Donations
         </span>
+      )
+    },
+    {
+      header: 'Actions',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => setSelectedDonorToDelete(row)}
+            className="flex items-center gap-1.5 text-xs py-1.5 px-3 font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white border border-rose-200 dark:border-rose-800 transition-all rounded-xl shadow-xs"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete Donor
+          </Button>
+        </div>
       )
     }
   ];
@@ -473,10 +540,40 @@ export default function UserManagement() {
         <DataTable
           columns={donorTableColumns}
           data={filteredDonors}
-          keyField="id"
+          keyField="donorId"
           emptyMessage="No matching user or donor records found for selected filters."
         />
       </Card>
+
+      {/* CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={Boolean(selectedDonorToDelete)}
+        onClose={() => {
+          if (!isDeleting) setSelectedDonorToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Donor?"
+        message={
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              Are you sure you want to delete{' '}
+              <strong className="font-bold text-slate-900 dark:text-white">
+                {selectedDonorToDelete?.donorName || selectedDonorToDelete?.fullName || selectedDonorToDelete?.name || 'this donor'}
+              </strong>
+              {selectedDonorToDelete?.email && (
+                <span className="text-slate-500 dark:text-slate-400"> ({selectedDonorToDelete.email})</span>
+              )}
+              ?
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              This will permanently remove their profile and all associated data from the system. This action cannot be undone.
+            </p>
+          </div>
+        }
+        confirmText="Delete Donor"
+        cancelText="Cancel"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

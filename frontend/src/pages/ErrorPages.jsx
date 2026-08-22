@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
 import { ShieldAlert, HelpCircle, AlertTriangle } from 'lucide-react';
 
@@ -29,6 +30,13 @@ export function NotFoundPage() {
  */
 export function ForbiddenPage() {
   const navigate = useNavigate();
+  const { logout } = useAuthStore();
+
+  const handleSwitchAccount = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] text-center p-6 gap-4">
       <div className="p-4 bg-orange-50 dark:bg-orange-950/40 text-orange-600 rounded-full animate-pulse">
@@ -38,9 +46,14 @@ export function ForbiddenPage() {
       <p className="text-sm text-gray-500 dark:text-slate-400 max-w-sm">
         You do not possess the authorization clearance levels required to load this registry.
       </p>
-      <Button onClick={() => navigate('/')} className="mt-2">
-        Return Home
-      </Button>
+      <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
+        <Button variant="outline" onClick={() => navigate('/')}>
+          Return Home
+        </Button>
+        <Button variant="primary" onClick={handleSwitchAccount}>
+          Sign in with Authorized Account
+        </Button>
+      </div>
     </div>
   );
 }

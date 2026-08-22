@@ -39,31 +39,46 @@ const requiredKeys = [
   'VITE_FIREBASE_APP_ID',
 ];
 
-const missingKeys = requiredKeys.filter(
-  (key) => !import.meta.env[key] || import.meta.env[key].trim() === ''
-);
+let _firebaseAppInstance = null;
 
-if (missingKeys.length > 0) {
-  console.warn(
-    '[Firebase] ⚠ The following environment variables are not set:\n',
-    missingKeys.map((k) => `  • ${k}`).join('\n'),
-    '\n  → Open frontend/.env and paste your Firebase configuration values.',
-    '\n  → FCM push notifications will NOT work until all values are set.'
-  );
-} else {
-  console.info('[Firebase] ✔ All required environment variables are present.');
-  console.info('[Firebase] Project ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
-}
+/**
+ * Returns the initialized FirebaseApp instance (lazily initialized on first call).
+ */
+export const getFirebaseApp = () => {
+  if (!_firebaseAppInstance) {
+    const missingKeys = requiredKeys.filter(
+      (key) => !import.meta.env[key] || import.meta.env[key].trim() === ''
+    );
 
-// ── Initialize Firebase App (idempotent — safe for HMR / React StrictMode) ──
-// getApps() returns existing apps; avoids "Firebase App named '[DEFAULT]' already exists" error.
-const firebaseApp = getApps().length === 0
-  ? initializeApp(firebaseConfig)
-  : getApp();
+    if (missingKeys.length > 0) {
+      console.warn(
+        '[Firebase] ⚠ The following environment variables are not set:\n',
+        missingKeys.map((k) => `  • ${k}`).join('\n'),
+        '\n  → Open frontend/.env and paste your Firebase configuration values.',
+        '\n  → FCM push notifications will NOT work until all values are set.'
+      );
+    } else {
+      console.info('[Firebase] ✔ All required environment variables are present.');
+      console.info('[Firebase] Project ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
+    }
 
-if (getApps().length > 0) {
-  console.info('[Firebase] ✔ FirebaseApp initialized successfully.');
-}
+    _firebaseAppInstance = getApps().length === 0
+      ? initializeApp(firebaseConfig)
+      : getApp();
+
+    console.info('[Firebase] ✔ FirebaseApp initialized successfully.');
+  }
+  return _firebaseAppInstance;
+};
+
+// Lazy proxy for backward compatibility with default export
+const firebaseApp = new Proxy({}, {
+  get(target, prop) {
+    const app = getFirebaseApp();
+    const val = app[prop];
+    return typeof val === 'function' ? val.bind(app) : val;
+  }
+});
 
 export default firebaseApp;
 export { firebaseConfig };

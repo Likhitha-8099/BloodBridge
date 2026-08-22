@@ -1,5 +1,6 @@
 import React from 'react';
-import logoImg from '../../assets/logo.png';
+import logoWebp from '../../assets/logo.webp';
+import logoPng from '../../assets/logo.png';
 
 /**
  * Official BloodBridge Reusable Logo Component.
@@ -26,11 +27,16 @@ export default function BloodBridgeLogo({
 
   return (
     <div className={`inline-flex items-center gap-2.5 ${className}`} {...props}>
-      <img
-        src={logoImg}
-        alt="BloodBridge Official Logo"
-        className={`${selectedSize} object-cover rounded-full transition-transform duration-200 shrink-0`}
-      />
+      <picture>
+        <source srcSet={logoWebp} type="image/webp" />
+        <img
+          src={logoPng}
+          alt="BloodBridge Official Logo"
+          className={`${selectedSize} object-cover rounded-full transition-transform duration-200 shrink-0`}
+          loading="eager"
+          decoding="async"
+        />
+      </picture>
       {showTagline && (
         <span className={`text-[10px] font-bold uppercase tracking-widest ${taglineColor}`}>
           Connecting Blood. Saving Lives.

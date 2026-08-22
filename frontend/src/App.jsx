@@ -1,16 +1,8 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import queryClient from './api/queryClient';
 import AppRoutes from './routes/AppRoutes';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
 
 /**
  * Top root entry App component wrapping global providers.

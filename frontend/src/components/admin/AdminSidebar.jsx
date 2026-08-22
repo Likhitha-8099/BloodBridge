@@ -4,7 +4,6 @@ import { useAuthStore } from '../../store/authStore';
 import { useUnreadNotifications } from '../../hooks/useNotifications';
 import {
   LayoutDashboard,
-  Award,
   Users,
   FileText,
   ClipboardList,
@@ -16,6 +15,8 @@ import {
   ChevronRight,
   ShieldCheck,
   User,
+  Heart,
+  Building2,
 } from 'lucide-react';
 
 const COLLAPSE_KEY = 'bb-admin-sidebar-collapsed';
@@ -28,10 +29,16 @@ const NAV_ITEMS = [
     description: 'System overview & metrics',
   },
   {
+    to: '/admin/donors',
+    label: 'Donors',
+    icon: Heart,
+    description: 'Manage registered donors',
+  },
+  {
     to: '/admin/hospitals',
-    label: 'Hospitals & Approvals',
-    icon: Award,
-    description: 'Verify hospital credentials',
+    label: 'Hospitals',
+    icon: Building2,
+    description: 'Manage registered hospitals',
   },
   {
     to: '/admin/users',
@@ -190,7 +197,7 @@ export default function AdminSidebar() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   return (

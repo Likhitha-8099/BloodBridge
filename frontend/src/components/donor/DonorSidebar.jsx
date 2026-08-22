@@ -196,7 +196,7 @@ export default function DonorSidebar() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   return (

@@ -102,12 +102,13 @@ const GLOBAL_MESSAGES = [
 export default function HospitalHeader({ onMenuToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const dropdownRef = useRef(null);
 
   // ── Emergency request count ─────────────────────────────────────────────────
   const [emergencyCount, setEmergencyCount] = useState(0);
   const fetchEmergencyCount = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await hospitalService.getEmergencyRequests(20);
       const list = Array.isArray(res) ? res : res?.data || [];
@@ -122,13 +123,14 @@ export default function HospitalHeader({ onMenuToggle }) {
     } catch {
       setEmergencyCount(0);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
+    if (!token) return;
     fetchEmergencyCount();
     const interval = setInterval(fetchEmergencyCount, 30000);
     return () => clearInterval(interval);
-  }, [fetchEmergencyCount]);
+  }, [fetchEmergencyCount, token]);
 
   // ── Rotating motivational ticker ────────────────────────────────────────────
   const [tickerIdx, setTickerIdx] = useState(0);
@@ -158,7 +160,7 @@ export default function HospitalHeader({ onMenuToggle }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   // ── Page info ───────────────────────────────────────────────────────────────

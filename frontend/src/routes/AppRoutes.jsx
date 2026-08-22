@@ -1,11 +1,13 @@
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import MainLayout from '../layouts/MainLayout';
+import Home from '../pages/Home';
 import ProtectedRoute from './ProtectedRoute';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
+// Lazy load MainLayout (for protected authenticated dashboards)
+const MainLayout = lazy(() => import('../layouts/MainLayout'));
+
 // Lazy load Auth Pages
-const Home = lazy(() => import('../pages/Home'));
 const DonorLogin = lazy(() => import('../pages/auth/DonorLogin'));
 const HospitalLogin = lazy(() => import('../pages/auth/HospitalLogin'));
 const AdminLogin = lazy(() => import('../pages/auth/AdminLogin'));
@@ -43,6 +45,10 @@ const HospitalAiAssistant = lazy(() => import('../pages/hospital/HospitalAiAssis
 
 // Admin Pages
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
+const DonorManagement = lazy(() => import('../pages/admin/DonorManagement'));
+const DonorDetails = lazy(() => import('../pages/admin/DonorDetails'));
+const HospitalManagement = lazy(() => import('../pages/admin/HospitalManagement'));
+const HospitalDetails = lazy(() => import('../pages/admin/HospitalDetails'));
 const UserManagement = lazy(() => import('../pages/admin/UserManagement'));
 const RequestAnalytics = lazy(() => import('../pages/admin/RequestAnalytics'));
 const DonationAnalytics = lazy(() => import('../pages/admin/DonationAnalytics'));
@@ -123,11 +129,15 @@ export default function AppRoutes() {
           {/* Admin Protected Area */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/donors" element={<DonorManagement />} />
+            <Route path="/admin/donors/:id" element={<DonorDetails />} />
+            <Route path="/admin/hospitals" element={<HospitalManagement />} />
+            <Route path="/admin/hospitals/:id" element={<HospitalDetails />} />
+            <Route path="/admin/hospitals-approvals" element={<HospitalAnalytics />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/requests" element={<RequestAnalytics />} />
             <Route path="/admin/donations" element={<DonationAnalytics />} />
             <Route path="/admin/matching" element={<MatchingAnalytics />} />
-            <Route path="/admin/hospitals" element={<HospitalAnalytics />} />
             <Route path="/admin/notifications" element={<NotificationAnalytics />} />
             <Route path="/admin/profile" element={<AdminProfile />} />
           </Route>

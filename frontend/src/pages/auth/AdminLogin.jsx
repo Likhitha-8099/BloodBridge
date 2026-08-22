@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -29,7 +29,7 @@ import {
  * Preserves 100% of existing authentication logic, state management, and API routes.
  */
 export default function AdminLogin() {
-  const { login, isAuthenticated, role } = useAuthStore();
+  const { login, logout, isAuthenticated, role } = useAuthStore();
   const { registerDevice } = useDeviceRegistration();
   const navigate = useNavigate();
   const shouldReduceMotion = useReducedMotion();
@@ -51,9 +51,15 @@ export default function AdminLogin() {
     }
   });
 
-  if (isAuthenticated && role) {
-    const dashboardPath = `/${role.toLowerCase()}/dashboard`;
-    return <Navigate to={dashboardPath} replace />;
+  // Clear previous module authentication if navigating from Donor or Hospital
+  useEffect(() => {
+    if (isAuthenticated && role !== 'ADMIN') {
+      logout();
+    }
+  }, [isAuthenticated, role, logout]);
+
+  if (isAuthenticated && role === 'ADMIN') {
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   const onSubmit = async (data) => {

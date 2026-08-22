@@ -82,7 +82,7 @@ export default function AdminHeader({ onMenuToggle }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   const path = location.pathname;
