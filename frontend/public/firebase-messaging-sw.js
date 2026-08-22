@@ -39,75 +39,80 @@ const firebaseConfig = {
   messagingSenderId: params.get('messagingSenderId') || '',
   appId: params.get('appId') || '',
 };
+
 // ── Step 3: Initialize Firebase in the Service Worker context ─────────────
-if (firebaseConfig.apiKey && firebaseConfig.apiKey.trim() !== '') {
-  firebase.initializeApp(firebaseConfig);
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.apiKey.trim() !== '') {
+    // Idempotent initialization: avoid duplicate app initialization errors
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
 
-  // ── Step 4: Get Messaging instance ──────────────────────────────────────
-  const messaging = firebase.messaging();
+    // ── Step 4: Get Messaging instance ──────────────────────────────────────
+    const messaging = firebase.messaging();
 
-  // ── Step 5: Handle background messages ──────────────────────────────────
-  // This handler fires when a push notification arrives and:
-  //   - The browser tab is closed
-  //   - BloodBridge is in the background
-  //   - The screen is locked
-  //
-  // Phase 3B Skeleton: logs payload only.
-  // Custom notification display logic will be added in Phase 3B Step 4.
-  messaging.onBackgroundMessage((payload) => {
-    console.log('[SW-Firebase] 📬 Background message received:', payload);
+    // ── Step 5: Handle background messages ──────────────────────────────────
+    // This handler fires when a push notification arrives and:
+    //   - The browser tab is closed
+    //   - BloodBridge is in the background
+    //   - The screen is locked
+    messaging.onBackgroundMessage((payload) => {
+      console.log('[SW-Firebase] 📬 Background message received:', payload);
 
-    // Extract notification data from payload
-    const notificationTitle = payload?.notification?.title || 'BloodBridge Alert';
-    const notificationBody = payload?.notification?.body || 'You have a new notification.';
-    const notificationIcon = payload?.notification?.icon || '/favicon.svg';
-    const notificationBadge = '/favicon.svg';
-    const notificationData = payload?.data || {};
+      // Extract notification data from payload
+      const notificationTitle = payload?.notification?.title || payload?.data?.title || 'BloodBridge Alert';
+      const notificationBody = payload?.notification?.body || payload?.data?.body || 'You have a new notification.';
+      const notificationIcon = payload?.notification?.icon || payload?.data?.icon || '/favicon.svg';
+      const notificationBadge = '/favicon.svg';
+      const notificationData = payload?.data || {};
 
-    // Display the notification
-    // In Step 4, this will be extended with action buttons, deep links, etc.
-    const notificationOptions = {
-      body: notificationBody,
-      icon: notificationIcon,
-      badge: notificationBadge,
-      data: notificationData,
-      // vibrate and actions will be configured in Step 4
-    };
+      // Display the notification
+      const notificationOptions = {
+        body: notificationBody,
+        icon: notificationIcon,
+        badge: notificationBadge,
+        data: notificationData,
+      };
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
-  });
+      self.registration.showNotification(notificationTitle, notificationOptions);
+    });
 
-  // ── Step 6: Handle notification click behavior ──────────────────────────
-  self.addEventListener('notificationclick', (event) => {
-    console.log('[SW-Firebase] 👆 Notification clicked:', event.notification);
-    event.notification.close();
-
-    const data = event.notification.data || {};
-    const requestId = data.requestId;
-    const clickAction = data.clickAction || '/donor/dashboard';
-    const targetUrl = requestId ? `${clickAction}?emergencyId=${requestId}` : clickAction;
-
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        for (const client of clientList) {
-          if (client.url && 'focus' in client) {
-            client.navigate(targetUrl);
-            return client.focus();
-          }
-        }
-        if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
-        }
-      })
+    console.log('[SW-Firebase] ✔ Firebase Messaging Service Worker initialized.');
+  } else {
+    // Config not yet set — log warning but do not throw
+    console.warn(
+      '[SW-Firebase] ⚠ Firebase config is empty or missing from URL query parameters.\n' +
+      'Ensure VITE_FIREBASE_* environment variables are configured in frontend/.env.\n' +
+      'Background notifications will not work until values are set.'
     );
-  });
-
-  console.log('[SW-Firebase] ✔ Firebase Messaging Service Worker initialized.');
-} else {
-  // Config not yet set — log warning but do not throw
-  console.warn(
-    '[SW-Firebase] ⚠ Firebase config is empty or missing from URL query parameters.\n' +
-    'Ensure VITE_FIREBASE_* environment variables are configured in frontend/.env.\n' +
-    'Background notifications will not work until values are set.'
-  );
+  }
+} catch (initErr) {
+  console.error('[SW-Firebase] ✘ Firebase initialization error in Service Worker:', initErr);
 }
+
+// ── Step 6: Handle notification click behavior ──────────────────────────
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW-Firebase] 👆 Notification clicked:', event.notification);
+  event.notification.close();
+
+  const data = event.notification.data || {};
+  const requestId = data.requestId;
+  const clickAction = data.clickAction || '/donor/dashboard';
+  const targetUrl = requestId ? `${clickAction}?emergencyId=${requestId}` : clickAction;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+
