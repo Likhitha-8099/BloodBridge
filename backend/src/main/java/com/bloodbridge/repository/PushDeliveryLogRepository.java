@@ -3,6 +3,7 @@ package com.bloodbridge.repository;
 import com.bloodbridge.entity.PushDeliveryLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -34,4 +35,8 @@ public interface PushDeliveryLogRepository extends JpaRepository<PushDeliveryLog
     List<PushDeliveryLog> findByEmergencyRequestId(Long emergencyRequestId);
 
     long countByCreatedAtAfter(LocalDateTime timestamp);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM PushDeliveryLog p WHERE (p.user IS NOT NULL AND p.user.id = :userId) OR (p.deviceToken IS NOT NULL AND p.deviceToken.user.id = :userId)")
+    void deleteAllByUserId(@Param("userId") Long userId);
 }

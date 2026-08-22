@@ -31,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.Optional;
 
 /**
  * Service implementation for single-role enterprise authentication workflows.
@@ -44,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final DonorProfileRepository donorProfileRepository;
     private final HospitalRepository hospitalRepository;
+    private final com.bloodbridge.repository.PatientProfileRepository patientProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -54,27 +56,64 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public ApiResponse<String> register(RegisterRequest request) {
-        log.info("Processing user registration for email: {} with role: {}", request.getEmail(), request.getRole());
-        if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("Registration failed - email {} already registered", request.getEmail());
-            throw new UserAlreadyExistsException("Email address is already registered: " + request.getEmail());
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        log.info("Processing user registration for email: {} with role: {}", email, request.getRole());
+
+        Optional<User> existingUserOpt = userRepository.findByEmail(email);
+
+        User userToSave;
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            if (Boolean.TRUE.equals(existingUser.getActive())) {
+                log.warn("Registration failed - email {} already registered and active", email);
+                throw new UserAlreadyExistsException("Email address is already registered: " + email);
+            }
+            log.info("Reactivating previously soft-deleted/deactivated account for email: {}", email);
+            existingUser.setFullName(request.getFullName());
+            existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            existingUser.setPhoneNumber(request.getPhoneNumber());
+            existingUser.setRole(request.getRole());
+            existingUser.setCity(request.getCity());
+            existingUser.setState(request.getState());
+            existingUser.setCountry(request.getCountry());
+            existingUser.setPostalCode(request.getPostalCode());
+            existingUser.setAddress(request.getAddress());
+            existingUser.setDateOfBirth(request.getDateOfBirth());
+            existingUser.setGender(request.getGender() != null ? request.getGender().name() : null);
+            existingUser.setLatitude(request.getLatitude());
+            existingUser.setLongitude(request.getLongitude());
+            existingUser.setActive(request.getRole() != Role.HOSPITAL);
+            if (existingUser.getRoles() == null) {
+                existingUser.setRoles(new java.util.HashSet<>());
+            }
+            existingUser.getRoles().clear();
+            existingUser.getRoles().add(request.getRole());
+            userToSave = existingUser;
+        } else {
+            userToSave = User.builder()
+                    .fullName(request.getFullName())
+                    .email(email)
+                    .password(passwordEncoder.encode(request.getPassword()))
+                    .phoneNumber(request.getPhoneNumber())
+                    .role(request.getRole())
+                    .city(request.getCity())
+                    .state(request.getState())
+                    .country(request.getCountry())
+                    .postalCode(request.getPostalCode())
+                    .address(request.getAddress())
+                    .dateOfBirth(request.getDateOfBirth())
+                    .gender(request.getGender() != null ? request.getGender().name() : null)
+                    .latitude(request.getLatitude())
+                    .longitude(request.getLongitude())
+                    .active(request.getRole() != Role.HOSPITAL)
+                    .build();
+            if (userToSave.getRoles() == null) {
+                userToSave.setRoles(new java.util.HashSet<>());
+            }
+            userToSave.getRoles().add(request.getRole());
         }
 
-        User user = User.builder()
-                .fullName(request.getFullName())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .phoneNumber(request.getPhoneNumber())
-                .role(request.getRole())
-                .city(request.getCity())
-                .state(request.getState())
-                .country(request.getCountry())
-                .postalCode(request.getPostalCode())
-                .address(request.getAddress())
-                .active(true)
-                .build();
-
-        User savedUser = userRepository.save(user);
+        User savedUser = userRepository.save(userToSave);
 
         // Publish WebSocket real-time registration event
         try {
@@ -101,101 +140,107 @@ public class AuthServiceImpl implements AuthService {
             log.error("Failed to publish real-time registration event: {}", e.getMessage());
         }
 
-        if (savedUser.getRole() == Role.DONOR && !donorProfileRepository.existsByUserId(savedUser.getId())) {
-            DonorProfile profile = DonorProfile.builder()
-                    .user(savedUser)
-                    .email(savedUser.getEmail())
-                    .bloodGroup(request.getBloodGroup())
-                    .rhFactor(request.getBloodGroup() != null && request.getBloodGroup().name().contains("POSITIVE") ? "POSITIVE" : "NEGATIVE")
-                    .age(request.getAge())
-                    .gender(request.getGender())
-                    .dateOfBirth(request.getDateOfBirth())
-                    .city(request.getCity())
-                    .state(request.getState())
-                    .weight(request.getWeight())
-                    .height(request.getHeight())
-                    .country(request.getCountry())
-                    .district(request.getDistrict())
-                    .postalCode(request.getPostalCode())
-                    .address(request.getAddress())
-                    .landmark(request.getLandmark())
-                    .latitude(request.getLatitude())
-                    .longitude(request.getLongitude())
-                    .alternatePhoneNumber(request.getAlternatePhoneNumber())
-                    .aadhaarNumber(request.getAadhaarNumber())
-                    .govtIdType(request.getGovtIdType())
-                    .govtIdNumber(request.getGovtIdNumber())
-                    .occupation(request.getOccupation())
-                    .emergencyContactName(request.getEmergencyContactName())
-                    .emergencyContactNumber(request.getEmergencyContactNumber())
-                    .emergencyContactRelationship(request.getEmergencyContactRelationship())
-                    .bmi(request.getBmi())
-                    .hemoglobin(request.getHemoglobin())
-                    .bloodPressure(request.getBloodPressure())
-                    .pulseRate(request.getPulseRate())
-                    .medicalConditions(request.getMedicalConditions())
-                    .currentMedications(request.getCurrentMedications())
-                    .allergies(request.getAllergies())
-                    .covidHistory(request.getCovidHistory())
-                    .travelHistory(request.getTravelHistory())
-                    .smoking(request.getSmoking() != null ? request.getSmoking() : false)
-                    .alcohol(request.getAlcohol() != null ? request.getAlcohol() : false)
-                    .drugUsage(request.getDrugUsage() != null ? request.getDrugUsage() : false)
-                    .pregnancy(request.getPregnancy() != null ? request.getPregnancy() : false)
-                    .breastfeeding(request.getBreastfeeding() != null ? request.getBreastfeeding() : false)
-                    .recentSurgery(request.getRecentSurgery() != null ? request.getRecentSurgery() : false)
-                    .recentTattoo(request.getRecentTattoo() != null ? request.getRecentTattoo() : false)
-                    .recentVaccination(request.getRecentVaccination() != null ? request.getRecentVaccination() : false)
-                    .recentFever(request.getRecentFever() != null ? request.getRecentFever() : false)
-                    .availableForDonation(true)
-                    .emergencyAvailable(request.getEmergencyAvailable() != null ? request.getEmergencyAvailable() : true)
-                    .preferredDonationRadius(request.getPreferredDonationRadius() != null ? request.getPreferredDonationRadius() : 25.0)
-                    .preferredHospitals(request.getPreferredHospitals())
-                    .preferredContactMethod(request.getPreferredContactMethod() != null ? request.getPreferredContactMethod() : "EMAIL")
-                    .availableDays(request.getAvailableDays())
-                    .availableTimeSlots(request.getAvailableTimeSlots())
-                    .willingDonatePlatelets(request.getWillingDonatePlatelets() != null ? request.getWillingDonatePlatelets() : true)
-                    .willingDonatePlasma(request.getWillingDonatePlasma() != null ? request.getWillingDonatePlasma() : true)
-                    .rareBloodDonor(request.getRareBloodDonor() != null ? request.getRareBloodDonor() : false)
-                    .pushNotificationEnabled(request.getPushNotificationEnabled() != null ? request.getPushNotificationEnabled() : true)
-                    .status("ACTIVE")
-                    .verificationStatus("VERIFIED")
-                    .totalDonations(0)
-                    .livesSaved(0)
-                    .donorScore(100)
-                    .build();
+        if (savedUser.getRole() == Role.DONOR) {
+            DonorProfile profile = donorProfileRepository.findByUserId(savedUser.getId())
+                    .or(() -> donorProfileRepository.findByEmail(savedUser.getEmail()))
+                    .orElseGet(() -> DonorProfile.builder().build());
+
+            profile.setUser(savedUser);
+            profile.setEmail(savedUser.getEmail());
+            profile.setBloodGroup(request.getBloodGroup() != null ? request.getBloodGroup() : (profile.getBloodGroup() != null ? profile.getBloodGroup() : com.bloodbridge.enums.BloodGroup.O_POSITIVE));
+            profile.setRhFactor(profile.getBloodGroup() != null && profile.getBloodGroup().name().contains("POSITIVE") ? "POSITIVE" : "NEGATIVE");
+            profile.setAge(request.getAge() != null ? request.getAge() : (profile.getAge() != null ? profile.getAge() : 25));
+            profile.setGender(request.getGender() != null ? request.getGender() : (profile.getGender() != null ? profile.getGender() : com.bloodbridge.enums.Gender.MALE));
+            profile.setDateOfBirth(request.getDateOfBirth() != null ? request.getDateOfBirth() : profile.getDateOfBirth());
+            profile.setCity(request.getCity() != null ? request.getCity() : (savedUser.getCity() != null ? savedUser.getCity() : "City"));
+            profile.setState(request.getState() != null ? request.getState() : (savedUser.getState() != null ? savedUser.getState() : "State"));
+            profile.setWeight(request.getWeight() != null ? request.getWeight() : (profile.getWeight() != null ? profile.getWeight() : 60.0));
+            profile.setHeight(request.getHeight() != null ? request.getHeight() : profile.getHeight());
+            profile.setCountry(request.getCountry() != null ? request.getCountry() : (savedUser.getCountry() != null ? savedUser.getCountry() : "India"));
+            profile.setDistrict(request.getDistrict() != null ? request.getDistrict() : profile.getDistrict());
+            profile.setPostalCode(request.getPostalCode() != null ? request.getPostalCode() : savedUser.getPostalCode());
+            profile.setAddress(request.getAddress() != null ? request.getAddress() : savedUser.getAddress());
+            profile.setLandmark(request.getLandmark() != null ? request.getLandmark() : profile.getLandmark());
+            profile.setLatitude(request.getLatitude() != null ? request.getLatitude() : savedUser.getLatitude());
+            profile.setLongitude(request.getLongitude() != null ? request.getLongitude() : savedUser.getLongitude());
+            profile.setAlternatePhoneNumber(request.getAlternatePhoneNumber() != null ? request.getAlternatePhoneNumber() : profile.getAlternatePhoneNumber());
+            profile.setAadhaarNumber(request.getAadhaarNumber() != null ? request.getAadhaarNumber() : profile.getAadhaarNumber());
+            profile.setGovtIdType(request.getGovtIdType() != null ? request.getGovtIdType() : profile.getGovtIdType());
+            profile.setGovtIdNumber(request.getGovtIdNumber() != null ? request.getGovtIdNumber() : profile.getGovtIdNumber());
+            profile.setOccupation(request.getOccupation() != null ? request.getOccupation() : profile.getOccupation());
+            profile.setEmergencyContactName(request.getEmergencyContactName() != null ? request.getEmergencyContactName() : "Emergency Contact");
+            profile.setEmergencyContactNumber(request.getEmergencyContactNumber() != null ? request.getEmergencyContactNumber() : (savedUser.getPhoneNumber() != null ? savedUser.getPhoneNumber() : "0000000000"));
+            profile.setEmergencyContactRelationship(request.getEmergencyContactRelationship() != null ? request.getEmergencyContactRelationship() : "Family");
+            profile.setBmi(request.getBmi() != null ? request.getBmi() : profile.getBmi());
+            profile.setHemoglobin(request.getHemoglobin() != null ? request.getHemoglobin() : profile.getHemoglobin());
+            profile.setBloodPressure(request.getBloodPressure() != null ? request.getBloodPressure() : profile.getBloodPressure());
+            profile.setPulseRate(request.getPulseRate() != null ? request.getPulseRate() : profile.getPulseRate());
+            profile.setMedicalConditions(request.getMedicalConditions() != null ? request.getMedicalConditions() : profile.getMedicalConditions());
+            profile.setCurrentMedications(request.getCurrentMedications() != null ? request.getCurrentMedications() : profile.getCurrentMedications());
+            profile.setAllergies(request.getAllergies() != null ? request.getAllergies() : profile.getAllergies());
+            profile.setCovidHistory(request.getCovidHistory() != null ? request.getCovidHistory() : profile.getCovidHistory());
+            profile.setTravelHistory(request.getTravelHistory() != null ? request.getTravelHistory() : profile.getTravelHistory());
+            profile.setSmoking(request.getSmoking() != null ? request.getSmoking() : (profile.getSmoking() != null ? profile.getSmoking() : false));
+            profile.setAlcohol(request.getAlcohol() != null ? request.getAlcohol() : (profile.getAlcohol() != null ? profile.getAlcohol() : false));
+            profile.setDrugUsage(request.getDrugUsage() != null ? request.getDrugUsage() : (profile.getDrugUsage() != null ? profile.getDrugUsage() : false));
+            profile.setPregnancy(request.getPregnancy() != null ? request.getPregnancy() : (profile.getPregnancy() != null ? profile.getPregnancy() : false));
+            profile.setBreastfeeding(request.getBreastfeeding() != null ? request.getBreastfeeding() : (profile.getBreastfeeding() != null ? profile.getBreastfeeding() : false));
+            profile.setRecentSurgery(request.getRecentSurgery() != null ? request.getRecentSurgery() : (profile.getRecentSurgery() != null ? profile.getRecentSurgery() : false));
+            profile.setRecentTattoo(request.getRecentTattoo() != null ? request.getRecentTattoo() : (profile.getRecentTattoo() != null ? profile.getRecentTattoo() : false));
+            profile.setRecentVaccination(request.getRecentVaccination() != null ? request.getRecentVaccination() : (profile.getRecentVaccination() != null ? profile.getRecentVaccination() : false));
+            profile.setRecentFever(request.getRecentFever() != null ? request.getRecentFever() : (profile.getRecentFever() != null ? profile.getRecentFever() : false));
+            profile.setAvailableForDonation(true);
+            profile.setEmergencyAvailable(request.getEmergencyAvailable() != null ? request.getEmergencyAvailable() : true);
+            profile.setPreferredDonationRadius(request.getPreferredDonationRadius() != null ? request.getPreferredDonationRadius() : 25.0);
+            profile.setPreferredHospitals(request.getPreferredHospitals() != null ? request.getPreferredHospitals() : profile.getPreferredHospitals());
+            profile.setPreferredContactMethod(request.getPreferredContactMethod() != null ? request.getPreferredContactMethod() : "EMAIL");
+            profile.setAvailableDays(request.getAvailableDays() != null ? request.getAvailableDays() : profile.getAvailableDays());
+            profile.setAvailableTimeSlots(request.getAvailableTimeSlots() != null ? request.getAvailableTimeSlots() : profile.getAvailableTimeSlots());
+            profile.setWillingDonatePlatelets(request.getWillingDonatePlatelets() != null ? request.getWillingDonatePlatelets() : true);
+            profile.setWillingDonatePlasma(request.getWillingDonatePlasma() != null ? request.getWillingDonatePlasma() : true);
+            profile.setRareBloodDonor(request.getRareBloodDonor() != null ? request.getRareBloodDonor() : false);
+            profile.setPushNotificationEnabled(request.getPushNotificationEnabled() != null ? request.getPushNotificationEnabled() : true);
+            profile.setStatus("ACTIVE");
+            profile.setVerificationStatus("VERIFIED");
+            if (profile.getTotalDonations() == null) profile.setTotalDonations(0);
+            if (profile.getLivesSaved() == null) profile.setLivesSaved(0);
+            if (profile.getDonorScore() == null) profile.setDonorScore(100);
 
             donorProfileRepository.save(profile);
-            log.info("Initial donor profile created for user ID: {}", savedUser.getId());
+            log.info("Donor profile created/updated for user ID: {}", savedUser.getId());
             return ApiResponse.success("User registered successfully", "User ID: " + savedUser.getId());
-        } else if (savedUser.getRole() == Role.HOSPITAL && !hospitalRepository.existsByUserId(savedUser.getId())) {
+        } else if (savedUser.getRole() == Role.HOSPITAL) {
             savedUser.setActive(false);
             userRepository.save(savedUser);
 
             String name = (request.getHospitalName() != null && !request.getHospitalName().isBlank()) ? request.getHospitalName() : savedUser.getFullName();
             String regNum = (request.getRegistrationNumber() != null && !request.getRegistrationNumber().isBlank()) ? request.getRegistrationNumber() : "REG-" + System.currentTimeMillis();
 
-            com.bloodbridge.entity.Hospital hospital = com.bloodbridge.entity.Hospital.builder()
-                    .user(savedUser)
-                    .hospitalName(name != null ? name : "Registered Hospital")
-                    .email(savedUser.getEmail())
-                    .phoneNumber(savedUser.getPhoneNumber() != null ? savedUser.getPhoneNumber() : "0000000000")
-                    .registrationNumber(regNum)
-                    .hospitalType(request.getHospitalType())
-                    .website(request.getWebsite())
-                    .address(request.getAddress() != null && !request.getAddress().isBlank() ? request.getAddress() : (savedUser.getAddress() != null ? savedUser.getAddress() : "Not Specified"))
-                    .city(request.getCity() != null && !request.getCity().isBlank() ? request.getCity() : (savedUser.getCity() != null ? savedUser.getCity() : "City"))
-                    .state(request.getState() != null && !request.getState().isBlank() ? request.getState() : (savedUser.getState() != null ? savedUser.getState() : "State"))
-                    .country(request.getCountry() != null ? request.getCountry() : savedUser.getCountry())
-                    .postalCode(request.getPostalCode() != null ? request.getPostalCode() : savedUser.getPostalCode())
-                    .latitude(request.getLatitude())
-                    .longitude(request.getLongitude())
-                    .verified(false)
-                    .verificationStatus("PENDING")
-                    .build();
+            com.bloodbridge.entity.Hospital hospital = hospitalRepository.findByUserId(savedUser.getId())
+                    .or(() -> hospitalRepository.findByEmail(savedUser.getEmail()))
+                    .orElseGet(() -> com.bloodbridge.entity.Hospital.builder().build());
+
+            hospital.setUser(savedUser);
+            hospital.setHospitalName(name != null ? name : "Registered Hospital");
+            hospital.setEmail(savedUser.getEmail());
+            hospital.setPhoneNumber(savedUser.getPhoneNumber() != null ? savedUser.getPhoneNumber() : "0000000000");
+            if (hospital.getRegistrationNumber() == null || hospital.getRegistrationNumber().isBlank()) {
+                hospital.setRegistrationNumber(regNum);
+            }
+            hospital.setHospitalType(request.getHospitalType() != null ? request.getHospitalType() : hospital.getHospitalType());
+            hospital.setWebsite(request.getWebsite() != null ? request.getWebsite() : hospital.getWebsite());
+            hospital.setAddress(request.getAddress() != null && !request.getAddress().isBlank() ? request.getAddress() : (savedUser.getAddress() != null ? savedUser.getAddress() : "Not Specified"));
+            hospital.setCity(request.getCity() != null && !request.getCity().isBlank() ? request.getCity() : (savedUser.getCity() != null ? savedUser.getCity() : "City"));
+            hospital.setState(request.getState() != null && !request.getState().isBlank() ? request.getState() : (savedUser.getState() != null ? savedUser.getState() : "State"));
+            hospital.setCountry(request.getCountry() != null ? request.getCountry() : savedUser.getCountry());
+            hospital.setPostalCode(request.getPostalCode() != null ? request.getPostalCode() : savedUser.getPostalCode());
+            hospital.setLatitude(request.getLatitude() != null ? request.getLatitude() : savedUser.getLatitude());
+            hospital.setLongitude(request.getLongitude() != null ? request.getLongitude() : savedUser.getLongitude());
+            hospital.setVerified(false);
+            hospital.setVerificationStatus("PENDING");
 
             hospitalRepository.save(hospital);
-            log.info("Initial hospital profile created for user ID: {} with status PENDING", savedUser.getId());
+            log.info("Hospital profile created/updated for user ID: {} with status PENDING", savedUser.getId());
 
             try {
                 notificationService.notifyAdmin(
@@ -209,6 +254,27 @@ public class AuthServiceImpl implements AuthService {
             }
 
             return ApiResponse.success("Hospital registration submitted successfully. Pending admin approval.", "User ID: " + savedUser.getId());
+        } else if (savedUser.getRole() == Role.PATIENT) {
+            com.bloodbridge.entity.PatientProfile patient = patientProfileRepository.findByUserId(savedUser.getId())
+                    .or(() -> patientProfileRepository.findByEmail(savedUser.getEmail()))
+                    .orElseGet(() -> com.bloodbridge.entity.PatientProfile.builder().build());
+
+            patient.setUser(savedUser);
+            patient.setAge(request.getAge() != null ? request.getAge() : (patient.getAge() != null ? patient.getAge() : 30));
+            patient.setGender(request.getGender() != null ? request.getGender() : patient.getGender());
+            patient.setBloodGroup(request.getBloodGroup() != null ? request.getBloodGroup() : (patient.getBloodGroup() != null ? patient.getBloodGroup() : com.bloodbridge.enums.BloodGroup.O_POSITIVE));
+            patient.setCity(request.getCity() != null ? request.getCity() : (savedUser.getCity() != null ? savedUser.getCity() : "City"));
+            patient.setState(request.getState() != null ? request.getState() : (savedUser.getState() != null ? savedUser.getState() : "State"));
+            patient.setCountry(request.getCountry() != null ? request.getCountry() : (savedUser.getCountry() != null ? savedUser.getCountry() : "India"));
+            patient.setPostalCode(request.getPostalCode() != null ? request.getPostalCode() : savedUser.getPostalCode());
+            patient.setAddress(request.getAddress() != null ? request.getAddress() : savedUser.getAddress());
+            patient.setEmergencyContactName(request.getEmergencyContactName() != null ? request.getEmergencyContactName() : "Emergency Contact");
+            patient.setEmergencyContactNumber(request.getEmergencyContactNumber() != null ? request.getEmergencyContactNumber() : (savedUser.getPhoneNumber() != null ? savedUser.getPhoneNumber() : "0000000000"));
+            patient.setStatus("ACTIVE");
+
+            patientProfileRepository.save(patient);
+            log.info("Patient profile created/updated for user ID: {}", savedUser.getId());
+            return ApiResponse.success("User registered successfully", "User ID: " + savedUser.getId());
         }
 
         log.info("User registered successfully with ID: {}", savedUser.getId());

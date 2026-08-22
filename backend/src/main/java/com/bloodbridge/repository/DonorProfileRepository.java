@@ -93,7 +93,7 @@ public interface DonorProfileRepository extends JpaRepository<DonorProfile, Long
      * @param pageable page settings to limit results (e.g. top 10)
      * @return list of top donor projections
      */
-    @org.springframework.data.jpa.repository.Query("SELECT d.user.fullName, d.bloodGroup, d.totalDonations FROM DonorProfile d ORDER BY d.totalDonations DESC")
+    @org.springframework.data.jpa.repository.Query("SELECT d.id, d.user.id, d.user.fullName, d.user.email, d.city, d.state, d.bloodGroup, d.totalDonations FROM DonorProfile d ORDER BY d.totalDonations DESC")
     List<Object[]> findTopDonors(org.springframework.data.domain.Pageable pageable);
 
     /**

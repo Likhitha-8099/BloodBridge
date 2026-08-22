@@ -30,8 +30,7 @@ public class Donation {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "donor_profile_id", nullable = false)
-    @NotNull(message = "Donor profile reference is required")
+    @JoinColumn(name = "donor_profile_id", nullable = true)
     private DonorProfile donor;
 
     @ManyToOne(fetch = FetchType.LAZY)

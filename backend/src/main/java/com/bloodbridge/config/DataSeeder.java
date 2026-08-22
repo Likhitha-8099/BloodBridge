@@ -25,6 +25,18 @@ public class DataSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
+    @org.springframework.beans.factory.annotation.Value("${app.admin.seed-enabled:true}")
+    private boolean adminSeedEnabled;
+
+    @org.springframework.beans.factory.annotation.Value("${app.admin.email:admin@bloodbridge.com}")
+    private String adminEmail;
+
+    @org.springframework.beans.factory.annotation.Value("${app.admin.password:Admin@12345}")
+    private String adminPassword;
+
+    @org.springframework.beans.factory.annotation.Value("${app.admin.phone:0000000000}")
+    private String adminPhone;
+
     @Override
     public void run(String... args) {
         // Startup Validation & Schema Migration Guard: Convert MySQL ENUMs to production-ready VARCHAR
@@ -44,31 +56,39 @@ public class DataSeeder implements CommandLineRunner {
                 try {
                     jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN patient_profile_id BIGINT NULL");
                 } catch (Exception ignored) {}
+                try {
+                    jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN donor_profile_id BIGINT NULL");
+                } catch (Exception ignored) {}
                 log.info("Startup Validation: Successfully aligned notifications, match_results, audit_logs, and donations table schema.");
             }
         } catch (Exception e) {
             log.warn("Startup Validation Warning: Schema alignment skipped: {}", e.getMessage());
         }
 
-        String adminEmail = "admin@bloodbridge.com";
-        
-        if (!userRepository.existsByEmail(adminEmail)) {
-            log.info("Default Admin account not found. Creating one...");
+        if (adminSeedEnabled) {
+            String targetEmail = (adminEmail != null && !adminEmail.isBlank()) ? adminEmail.trim().toLowerCase() : "admin@bloodbridge.com";
             
-            User admin = User.builder()
-                    .fullName("System Administrator")
-                    .email(adminEmail)
-                    .password(passwordEncoder.encode("Admin@12345"))
-                    .phoneNumber("0000000000")
-                    .role(Role.ADMIN)
-                    .roles(new HashSet<>(List.of(Role.ADMIN)))
-                    .active(true)
-                    .build();
-                    
-            userRepository.save(admin);
-            log.info("Default Admin account created successfully.");
-        } else {
-            log.info("Default Admin account already exists.");
+            if (!userRepository.existsByEmail(targetEmail)) {
+                log.info("Initial System Admin account not found for {}. Creating initial account...", targetEmail);
+                
+                String initialPassword = (adminPassword != null && !adminPassword.isBlank()) ? adminPassword : "Admin@12345";
+                String initialPhone = (adminPhone != null && !adminPhone.isBlank()) ? adminPhone : "0000000000";
+
+                User admin = User.builder()
+                        .fullName("System Administrator")
+                        .email(targetEmail)
+                        .password(passwordEncoder.encode(initialPassword))
+                        .phoneNumber(initialPhone)
+                        .role(Role.ADMIN)
+                        .roles(new HashSet<>(List.of(Role.ADMIN)))
+                        .active(true)
+                        .build();
+                        
+                userRepository.save(admin);
+                log.info("Initial System Admin account created successfully for {}.", targetEmail);
+            } else {
+                log.info("System Admin account already exists for {}.", targetEmail);
+            }
         }
     }
 }

@@ -89,4 +89,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     long countByDeliveryChannelAndStatus(com.bloodbridge.enums.DeliveryChannel deliveryChannel, NotificationStatus status);
 
     long countByDeliveryChannelAndNotificationType(com.bloodbridge.enums.DeliveryChannel deliveryChannel, com.bloodbridge.enums.NotificationType notificationType);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Notification n WHERE n.recipientUser.id = :userId")
+    void deleteAllByRecipientUserId(@Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Notification n SET n.donor = null WHERE n.donor.id = :donorId")
+    void unlinkDonorProfile(@Param("donorId") Long donorId);
 }

@@ -105,4 +105,12 @@ public interface DonationRepository extends JpaRepository<Donation, Long> {
      */
     @org.springframework.data.jpa.repository.Query("SELECT YEAR(d.createdAt) as yr, MONTH(d.createdAt) as mo, COUNT(d) FROM Donation d WHERE d.createdAt >= :startDate GROUP BY YEAR(d.createdAt), MONTH(d.createdAt)")
     List<Object[]> getMonthlyDonationCounts(@org.springframework.data.repository.query.Param("startDate") java.time.LocalDateTime startDate);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE donations SET donor_profile_id = NULL, match_result_id = NULL WHERE donor_profile_id = :donorId", nativeQuery = true)
+    void unlinkDonorProfile(@org.springframework.data.repository.query.Param("donorId") Long donorId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE donations d JOIN match_results mr ON mr.id = d.match_result_id SET d.match_result_id = NULL WHERE mr.donor_profile_id = :donorId", nativeQuery = true)
+    void unlinkDonorMatchResults(@org.springframework.data.repository.query.Param("donorId") Long donorId);
 }

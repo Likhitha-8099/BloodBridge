@@ -83,6 +83,9 @@ public class NotificationServiceImpl implements NotificationService {
     @Qualifier("emergencyEmailExecutor")
     private final Executor emergencyEmailExecutor;
 
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
+
     private void publishRealtimeNotification(Notification saved) {
         if (saved == null || saved.getRecipientUser() == null) return;
         try {
@@ -712,7 +715,7 @@ public class NotificationServiceImpl implements NotificationService {
                     .state(donor.getState())
                     .requiredByDate(request.getRequiredByDate() != null ? request.getRequiredByDate().toString() : "Immediate")
                     .reason(request.getReason() != null ? request.getReason() : "Emergency Requirement")
-                    .loginUrl("http://localhost:5173/login")
+                    .loginUrl(frontendUrl + "/login")
                     .build();
 
             emergencyEmailExecutor.execute(() -> {

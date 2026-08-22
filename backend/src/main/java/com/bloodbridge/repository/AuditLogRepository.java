@@ -23,4 +23,12 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     default Page<AuditLog> findAllByOrderByTimestampDesc(Pageable pageable) {
         return findAllByOrderByCreatedAtDesc(pageable);
     }
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE audit_logs SET user_id = NULL WHERE user_id = :userId", nativeQuery = true)
+    void unlinkUser(@org.springframework.data.repository.query.Param("userId") Long userId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE audit_logs SET donor_id = NULL WHERE donor_id = :donorId", nativeQuery = true)
+    void unlinkDonor(@org.springframework.data.repository.query.Param("donorId") Long donorId);
 }

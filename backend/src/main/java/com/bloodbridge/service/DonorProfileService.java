@@ -102,4 +102,12 @@ public interface DonorProfileService {
      * @return ApiResponse confirming profile deletion
      */
     ApiResponse<String> deleteProfile(String email);
+
+    /**
+     * Admin: Permanently deletes donor profile and user account.
+     *
+     * @param id donor profile ID or user ID
+     * @return ApiResponse confirming donor deletion
+     */
+    ApiResponse<String> deleteDonorById(Long id);
 }

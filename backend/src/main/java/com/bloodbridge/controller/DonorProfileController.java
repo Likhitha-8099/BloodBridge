@@ -199,4 +199,18 @@ public class DonorProfileController {
         ApiResponse<String> response = donorProfileService.deleteProfile(userDetails.getUsername());
         return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "Admin: Permanently Delete Donor", description = "Permanently deletes a donor profile and associated user account.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Donor deleted successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Donor not found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Admin access required")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<String>> deleteDonorById(@PathVariable Long id) {
+        log.info("Admin request to permanently delete donor profile ID: {}", id);
+        ApiResponse<String> response = donorProfileService.deleteDonorById(id);
+        return ResponseEntity.ok(response);
+    }
 }

@@ -12,6 +12,8 @@ import com.bloodbridge.dto.response.HospitalResponse;
 import com.bloodbridge.dto.response.SystemHealthResponse;
 import com.bloodbridge.dto.response.UserPageResponse;
 import com.bloodbridge.dto.response.UserProfileResponse;
+import com.bloodbridge.dto.response.DonorProfileResponse;
+import com.bloodbridge.entity.DonorProfile;
 import com.bloodbridge.entity.AuditLog;
 import com.bloodbridge.entity.BloodInventory;
 import com.bloodbridge.entity.BloodRequest;
@@ -61,6 +63,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -85,10 +88,12 @@ public class AdminServiceImpl implements AdminService {
     private final HospitalMapper hospitalMapper;
     private final UserMapper userMapper;
     private final BloodRequestMapper bloodRequestMapper;
+    private final com.bloodbridge.mapper.DonorProfileMapper donorProfileMapper;
     private final NotificationService notificationService;
     private final AuditLoggerService auditLoggerService;
     private final RealtimeService realtimeService;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.bloodbridge.service.UserService userService;
 
     private static final long START_TIME = System.currentTimeMillis();
 
@@ -607,5 +612,179 @@ public class AdminServiceImpl implements AdminService {
 
         auditLoggerService.logEvent("BROADCAST_SENT", adminEmail, "Target broadcast sent to " + sentCount + " users.");
         return ApiResponse.success("Target broadcast notification sent to " + sentCount + " users successfully");
+    }
+
+    @Override
+    public ApiResponse<String> deleteDonor(Long donorId, String adminEmail) {
+        log.info("Admin {} permanently deleting donor ID: {}", adminEmail, donorId);
+        return userService.deleteDonor(donorId);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<List<DonorProfileResponse>> getAllDonors(String search, String bloodGroup, String city) {
+        log.info("Admin fetching all registered donors (search: {}, bloodGroup: {}, city: {})", search, bloodGroup, city);
+
+        List<DonorProfile> existingDonors = donorProfileRepository.findAll();
+        Set<Long> registeredUserIds = existingDonors.stream()
+                .filter(d -> d.getUser() != null)
+                .map(d -> d.getUser().getId())
+                .collect(Collectors.toSet());
+
+        List<User> donorUsers = userRepository.findAll().stream()
+                .filter(u -> u.getRole() == com.bloodbridge.enums.Role.DONOR || (u.getRoles() != null && u.getRoles().contains(com.bloodbridge.enums.Role.DONOR)))
+                .collect(Collectors.toList());
+
+        for (User u : donorUsers) {
+            if (!registeredUserIds.contains(u.getId())) {
+                log.info("Auto-syncing missing DonorProfile for user ID: {} ({})", u.getId(), u.getEmail());
+                DonorProfile newDp = DonorProfile.builder()
+                        .user(u)
+                        .email(u.getEmail())
+                        .bloodGroup(com.bloodbridge.enums.BloodGroup.O_POSITIVE)
+                        .rhFactor("POSITIVE")
+                        .age(u.getDateOfBirth() != null ? java.time.Period.between(u.getDateOfBirth(), java.time.LocalDate.now()).getYears() : 25)
+                        .gender(u.getGender() != null && u.getGender().equalsIgnoreCase("FEMALE") ? com.bloodbridge.enums.Gender.FEMALE : com.bloodbridge.enums.Gender.MALE)
+                        .dateOfBirth(u.getDateOfBirth())
+                        .city(u.getCity() != null ? u.getCity() : "City")
+                        .state(u.getState() != null ? u.getState() : "State")
+                        .country(u.getCountry() != null ? u.getCountry() : "India")
+                        .postalCode(u.getPostalCode())
+                        .address(u.getAddress())
+                        .latitude(u.getLatitude())
+                        .longitude(u.getLongitude())
+                        .availableForDonation(true)
+                        .emergencyAvailable(true)
+                        .preferredDonationRadius(25.0)
+                        .status("ACTIVE")
+                        .verificationStatus("VERIFIED")
+                        .totalDonations(0)
+                        .livesSaved(0)
+                        .donorScore(100)
+                        .build();
+                donorProfileRepository.save(newDp);
+                existingDonors.add(newDp);
+                registeredUserIds.add(u.getId());
+            }
+        }
+
+        List<DonorProfileResponse> list = existingDonors.stream()
+                .filter(d -> {
+                    if (search != null && !search.isBlank()) {
+                        String q = search.trim().toLowerCase();
+                        String name = (d.getUser() != null && d.getUser().getFullName() != null) ? d.getUser().getFullName().toLowerCase() : "";
+                        String email = (d.getEmail() != null) ? d.getEmail().toLowerCase() : ((d.getUser() != null && d.getUser().getEmail() != null) ? d.getUser().getEmail().toLowerCase() : "");
+                        String phone = (d.getUser() != null && d.getUser().getPhoneNumber() != null) ? d.getUser().getPhoneNumber() : "";
+                        String c = (d.getCity() != null) ? d.getCity().toLowerCase() : "";
+                        if (!name.contains(q) && !email.contains(q) && !phone.contains(q) && !c.contains(q)) return false;
+                    }
+                    if (bloodGroup != null && !bloodGroup.isBlank() && !"ALL".equalsIgnoreCase(bloodGroup)) {
+                        String bg = d.getBloodGroup() != null ? d.getBloodGroup().name().replace("_POSITIVE", "+").replace("_NEGATIVE", "-") : "";
+                        if (!bg.equalsIgnoreCase(bloodGroup) && (d.getBloodGroup() == null || !d.getBloodGroup().name().equalsIgnoreCase(bloodGroup))) return false;
+                    }
+                    if (city != null && !city.isBlank() && !"ALL".equalsIgnoreCase(city)) {
+                        if (d.getCity() == null || !d.getCity().equalsIgnoreCase(city.trim())) return false;
+                    }
+                    return true;
+                })
+                .map(donorProfileMapper::toResponse)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        return ApiResponse.success("All registered donors retrieved successfully", list);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<DonorProfileResponse> getDonorById(Long id) {
+        log.info("Admin fetching donor profile details for ID: {}", id);
+        DonorProfile donor = donorProfileRepository.findById(id)
+                .or(() -> donorProfileRepository.findByUserId(id))
+                .orElseThrow(() -> new UserNotFoundException("Donor profile not found for ID: " + id));
+        return ApiResponse.success("Donor profile details retrieved successfully", donorProfileMapper.toResponse(donor));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<List<HospitalResponse>> getAllHospitals(String search, String city, String status) {
+        log.info("Admin fetching all registered hospitals (search: {}, city: {}, status: {})", search, city, status);
+        List<Hospital> hospitals = hospitalRepository.findAll();
+        List<HospitalResponse> list = hospitals.stream()
+                .filter(h -> {
+                    if (search != null && !search.isBlank()) {
+                        String q = search.trim().toLowerCase();
+                        String name = h.getHospitalName() != null ? h.getHospitalName().toLowerCase() : "";
+                        String email = h.getEmail() != null ? h.getEmail().toLowerCase() : "";
+                        String phone = h.getPhoneNumber() != null ? h.getPhoneNumber() : "";
+                        String c = h.getCity() != null ? h.getCity().toLowerCase() : "";
+                        if (!name.contains(q) && !email.contains(q) && !phone.contains(q) && !c.contains(q)) return false;
+                    }
+                    if (city != null && !city.isBlank() && !"ALL".equalsIgnoreCase(city)) {
+                        if (h.getCity() == null || !h.getCity().equalsIgnoreCase(city.trim())) return false;
+                    }
+                    if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+                        if (h.getVerificationStatus() == null || !h.getVerificationStatus().equalsIgnoreCase(status.trim())) return false;
+                    }
+                    return true;
+                })
+                .map(hospitalMapper::toResponse)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        return ApiResponse.success("All registered hospitals retrieved successfully", list);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<HospitalResponse> getHospitalById(Long id) {
+        log.info("Admin fetching hospital details for ID: {}", id);
+        Hospital hospital = hospitalRepository.findById(id)
+                .or(() -> hospitalRepository.findByUserId(id))
+                .orElseThrow(() -> new HospitalNotFoundException("Hospital not found for ID: " + id));
+        return ApiResponse.success("Hospital profile details retrieved successfully", hospitalMapper.toResponse(hospital));
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> deleteHospital(Long hospitalId, String adminEmail) {
+        log.info("Admin {} permanently deleting hospital ID: {}", adminEmail, hospitalId);
+        Hospital hospital = hospitalRepository.findById(hospitalId)
+                .or(() -> hospitalRepository.findByUserId(hospitalId))
+                .orElseThrow(() -> new HospitalNotFoundException("Hospital not found for ID: " + hospitalId));
+
+        Long hid = hospital.getId();
+        User user = hospital.getUser();
+
+        // 1. Unlink donations associated with this hospital to preserve medical records
+        try {
+            List<Donation> donations = donationRepository.findAll().stream()
+                    .filter(d -> d.getHospital() != null && d.getHospital().getId().equals(hid))
+                    .collect(Collectors.toList());
+            for (Donation d : donations) {
+                d.setHospital(null);
+                donationRepository.save(d);
+            }
+        } catch (Exception ex) {
+            log.warn("Unlinking hospital donations encountered warning: {}", ex.getMessage());
+        }
+
+        // 2. Delete inventory records for this hospital
+        try {
+            List<BloodInventory> inventories = bloodInventoryRepository.findByHospitalId(hid);
+            if (inventories != null && !inventories.isEmpty()) {
+                bloodInventoryRepository.deleteAll(inventories);
+            }
+        } catch (Exception ex) {
+            log.warn("Deleting hospital inventory encountered warning: {}", ex.getMessage());
+        }
+
+        // 3. Delete hospital entity
+        hospitalRepository.delete(hospital);
+
+        // 4. Delete user if exists
+        if (user != null) {
+            userService.deleteUser(user.getId());
+        }
+
+        auditLoggerService.logEvent("HOSPITAL_PERMANENTLY_DELETED", adminEmail, "Hospital ID " + hid + " deleted by admin " + adminEmail);
+        return ApiResponse.success("Hospital permanently deleted successfully");
     }
 }

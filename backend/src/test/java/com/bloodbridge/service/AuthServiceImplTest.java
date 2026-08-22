@@ -118,7 +118,7 @@ class AuthServiceImplTest {
 
     @Test
     void register_Success() {
-        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(false);
+        when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("encodedPassword");
         when(userRepository.save(any(User.class))).thenReturn(user);
 
@@ -130,8 +130,29 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void register_ThrowsException_WhenEmailExists() {
-        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(true);
+    void register_Success_WhenAccountWasDeactivated() {
+        User deactivatedUser = User.builder()
+                .id(2L)
+                .fullName("Inactive User")
+                .email(registerRequest.getEmail())
+                .active(false)
+                .build();
+
+        when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.of(deactivatedUser));
+        when(passwordEncoder.encode(any(CharSequence.class))).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(deactivatedUser);
+
+        ApiResponse<String> response = authService.register(registerRequest);
+
+        assertNotNull(response);
+        assertEquals("User registered successfully", response.getMessage());
+        assertTrue(deactivatedUser.getActive());
+        verify(userRepository, times(1)).save(deactivatedUser);
+    }
+
+    @Test
+    void register_ThrowsException_WhenActiveEmailExists() {
+        when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.of(user));
 
         assertThrows(UserAlreadyExistsException.class, () -> authService.register(registerRequest));
         verify(userRepository, never()).save(any(User.class));

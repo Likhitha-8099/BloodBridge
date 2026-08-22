@@ -11,6 +11,7 @@ import com.bloodbridge.dto.response.HospitalResponse;
 import com.bloodbridge.dto.response.SystemHealthResponse;
 import com.bloodbridge.dto.response.UserPageResponse;
 import com.bloodbridge.dto.response.UserProfileResponse;
+import com.bloodbridge.dto.response.DonorProfileResponse;
 
 import java.util.List;
 
@@ -130,4 +131,38 @@ public interface AdminService {
      * @return ApiResponse confirmation message
      */
     ApiResponse<String> broadcastTargetNotification(String adminEmail, String title, String message, String role, String targetCity, String priority);
+
+    /**
+     * Permanently deletes a donor profile, user account, and dependent records.
+     *
+     * @param donorId donor profile ID or user ID
+     * @param adminEmail admin email
+     * @return ApiResponse confirmation message
+     */
+    ApiResponse<String> deleteDonor(Long donorId, String adminEmail);
+
+    /**
+     * Retrieves all registered donors with optional search, blood group, and city filters.
+     */
+    ApiResponse<List<DonorProfileResponse>> getAllDonors(String search, String bloodGroup, String city);
+
+    /**
+     * Retrieves detailed profile for a specific donor ID.
+     */
+    ApiResponse<DonorProfileResponse> getDonorById(Long id);
+
+    /**
+     * Retrieves all registered hospitals with optional search, city, and status filters.
+     */
+    ApiResponse<List<HospitalResponse>> getAllHospitals(String search, String city, String status);
+
+    /**
+     * Retrieves detailed profile for a specific hospital ID.
+     */
+    ApiResponse<HospitalResponse> getHospitalById(Long id);
+
+    /**
+     * Permanently deletes a hospital profile, user account, and dependent records.
+     */
+    ApiResponse<String> deleteHospital(Long hospitalId, String adminEmail);
 }

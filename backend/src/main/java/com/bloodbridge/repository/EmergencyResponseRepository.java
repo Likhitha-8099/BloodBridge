@@ -53,4 +53,8 @@ public interface EmergencyResponseRepository extends JpaRepository<EmergencyResp
      */
     @Query("SELECT AVG(r.responseTimeSeconds) FROM EmergencyResponse r WHERE r.bloodRequest.id = :requestId AND r.status = 'ACCEPTED'")
     Double findAverageResponseTimeSecondsByBloodRequestId(@Param("requestId") Long requestId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM EmergencyResponse er WHERE er.donor.id = :donorId")
+    void deleteAllByDonorId(@Param("donorId") Long donorId);
 }

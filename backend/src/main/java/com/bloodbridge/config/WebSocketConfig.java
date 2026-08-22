@@ -43,14 +43,40 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setUserDestinationPrefix("/user");
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8083}")
+    private String allowedOrigins;
+
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
+
+    private String[] resolveAllowedOriginPatterns() {
+        java.util.Set<String> patterns = new java.util.LinkedHashSet<>();
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            for (String origin : allowedOrigins.split(",")) {
+                String trimmed = origin.trim();
+                if (!trimmed.isEmpty()) {
+                    patterns.add(trimmed);
+                }
+            }
+        }
+        if (frontendUrl != null && !frontendUrl.isBlank()) {
+            patterns.add(frontendUrl.trim());
+        }
+        if (patterns.isEmpty()) {
+            patterns.add("*");
+        }
+        return patterns.toArray(new String[0]);
+    }
+
     @Override
     public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
+        String[] patterns = resolveAllowedOriginPatterns();
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOriginPatterns(patterns)
                 .withSockJS();
 
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*");
+                .setAllowedOriginPatterns(patterns);
     }
 
     @Override

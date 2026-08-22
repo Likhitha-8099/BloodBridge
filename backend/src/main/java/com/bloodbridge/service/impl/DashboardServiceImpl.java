@@ -335,12 +335,36 @@ public class DashboardServiceImpl implements DashboardService {
     @Transactional(readOnly = true)
     public List<TopDonorResponse> getTopDonors() {
         List<Object[]> queryResults = donorProfileRepository.findTopDonors(PageRequest.of(0, 10));
+        if (queryResults == null || queryResults.isEmpty()) {
+            return Collections.emptyList();
+        }
         return queryResults.stream()
-                .map(row -> TopDonorResponse.builder()
-                        .donorName((String) row[0])
-                        .bloodGroup((BloodGroup) row[1])
-                        .totalDonations(((Number) row[2]).intValue())
-                        .build())
+                .map(row -> {
+                    Long id = (row != null && row.length > 0 && row[0] != null) ? ((Number) row[0]).longValue() : null;
+                    Long userId = (row != null && row.length > 1 && row[1] != null) ? ((Number) row[1]).longValue() : null;
+                    String name = (row != null && row.length > 2 && row[2] != null) ? row[2].toString() : "Registered Donor";
+                    String email = (row != null && row.length > 3 && row[3] != null) ? row[3].toString() : null;
+                    String city = (row != null && row.length > 4 && row[4] != null) ? row[4].toString() : null;
+                    String state = (row != null && row.length > 5 && row[5] != null) ? row[5].toString() : null;
+                    BloodGroup bg = null;
+                    if (row != null && row.length > 6 && row[6] != null) {
+                        bg = (row[6] instanceof BloodGroup) ? (BloodGroup) row[6] : BloodGroup.valueOf(row[6].toString());
+                    }
+                    Integer donations = (row != null && row.length > 7 && row[7] != null) ? ((Number) row[7]).intValue() : 0;
+
+                    return TopDonorResponse.builder()
+                            .id(id)
+                            .donorId(id)
+                            .userId(userId)
+                            .donorName(name)
+                            .email(email)
+                            .city(city)
+                            .state(state)
+                            .role("DONOR")
+                            .bloodGroup(bg)
+                            .totalDonations(donations)
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 

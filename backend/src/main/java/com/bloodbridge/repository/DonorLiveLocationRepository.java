@@ -81,4 +81,8 @@ public interface DonorLiveLocationRepository extends JpaRepository<DonorLiveLoca
     @Query("SELECT AVG(d.speedKmh) FROM DonorLiveLocation d " +
            "WHERE d.trackingStatus = 'MOVING' AND d.speedKmh IS NOT NULL AND d.lastUpdated > :since")
     Double findAverageSpeedKmhSince(@Param("since") LocalDateTime since);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM DonorLiveLocation d WHERE d.donorId = :donorId")
+    void deleteAllByDonorId(@Param("donorId") Long donorId);
 }

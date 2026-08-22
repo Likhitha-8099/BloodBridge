@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -112,9 +113,36 @@ public class HospitalServiceImpl implements HospitalService {
             throw new HospitalAlreadyExistsException("Hospital profile already exists for user: " + email);
         }
 
-        if (hospitalRepository.existsByRegistrationNumber(request.getRegistrationNumber())) {
-            log.warn("Hospital creation failed: Registration number {} already registered", request.getRegistrationNumber());
-            throw new HospitalAlreadyExistsException("Registration number already registered: " + request.getRegistrationNumber());
+        Optional<Hospital> existingByReg = hospitalRepository.findByRegistrationNumber(request.getRegistrationNumber());
+        if (existingByReg.isPresent()) {
+            Hospital existingHosp = existingByReg.get();
+            if (existingHosp.getUser() != null && !existingHosp.getUser().getId().equals(user.getId()) && Boolean.TRUE.equals(existingHosp.getUser().getActive())) {
+                log.warn("Hospital creation failed: Registration number {} already registered", request.getRegistrationNumber());
+                throw new HospitalAlreadyExistsException("Registration number already registered: " + request.getRegistrationNumber());
+            }
+            existingHosp.setUser(user);
+            if (request.getHospitalName() != null) existingHosp.setHospitalName(request.getHospitalName());
+            if (request.getLicenseNumber() != null) existingHosp.setLicenseNumber(request.getLicenseNumber());
+            if (request.getHospitalType() != null) existingHosp.setHospitalType(request.getHospitalType());
+            if (request.getContactPerson() != null) existingHosp.setContactPerson(request.getContactPerson());
+            if (request.getEmail() != null) existingHosp.setEmail(request.getEmail());
+            if (request.getPhoneNumber() != null) existingHosp.setPhoneNumber(request.getPhoneNumber());
+            if (request.getWebsite() != null) existingHosp.setWebsite(request.getWebsite());
+            if (request.getAddress() != null) existingHosp.setAddress(request.getAddress());
+            if (request.getCity() != null) existingHosp.setCity(request.getCity());
+            if (request.getState() != null) existingHosp.setState(request.getState());
+            if (request.getCountry() != null) existingHosp.setCountry(request.getCountry());
+            if (request.getPostalCode() != null) existingHosp.setPostalCode(request.getPostalCode());
+            if (request.getLatitude() != null) existingHosp.setLatitude(request.getLatitude());
+            if (request.getLongitude() != null) existingHosp.setLongitude(request.getLongitude());
+            if (request.getOperatingHours() != null) existingHosp.setOperatingHours(request.getOperatingHours());
+            if (request.getEmergencyAvailable() != null) existingHosp.setEmergencyAvailable(request.getEmergencyAvailable());
+            Hospital savedHospital = hospitalRepository.save(existingHosp);
+            initializeHospitalInventory(savedHospital);
+            auditLoggerService.logEvent("HOSPITAL_REGISTERED", email, "Hospital registered: " + savedHospital.getHospitalName());
+            log.info("Hospital profile updated successfully with ID: {}", savedHospital.getId());
+            HospitalResponse response = hospitalMapper.toResponse(savedHospital);
+            return ApiResponse.success("Hospital profile created successfully. Verification pending.", response);
         }
 
         Hospital hospital = hospitalMapper.toEntity(request, user);

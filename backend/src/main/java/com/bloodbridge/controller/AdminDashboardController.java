@@ -12,6 +12,7 @@ import com.bloodbridge.dto.response.HospitalResponse;
 import com.bloodbridge.dto.response.SystemHealthResponse;
 import com.bloodbridge.dto.response.UserPageResponse;
 import com.bloodbridge.dto.response.UserProfileResponse;
+import com.bloodbridge.dto.response.DonorProfileResponse;
 import com.bloodbridge.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -236,6 +237,80 @@ public class AdminDashboardController {
                 targetCity,
                 request.getPriority() != null ? request.getPriority() : "NORMAL"
         );
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Admin: Permanently Delete Donor", description = "Permanently deletes a donor profile, user account, and associated dependent data.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Donor permanently deleted"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Donor not found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Admin access required")
+    })
+    @org.springframework.web.bind.annotation.DeleteMapping("/donors/{donorId}")
+    public ResponseEntity<ApiResponse<String>> deleteDonor(
+            @PathVariable Long donorId,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        String adminEmail = (userDetails != null && userDetails.getUsername() != null) ? userDetails.getUsername() : "admin@bloodbridge.com";
+        log.info("Admin {} request to permanently delete donor ID: {}", adminEmail, donorId);
+        ApiResponse<String> response = adminService.deleteDonor(donorId, adminEmail);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Admin: Get All Registered Donors", description = "Retrieves list of all registered donors with search, blood group, and city filters.")
+    @GetMapping("/donors")
+    public ResponseEntity<ApiResponse<List<DonorProfileResponse>>> getAllDonors(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String bloodGroup,
+            @RequestParam(required = false) String city
+    ) {
+        log.info("Admin request to fetch all registered donors (search: {}, bloodGroup: {}, city: {})", search, bloodGroup, city);
+        ApiResponse<List<DonorProfileResponse>> response = adminService.getAllDonors(search, bloodGroup, city);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Admin: Get Donor Details By ID", description = "Retrieves complete profile details for a specific donor ID.")
+    @GetMapping("/donors/{id}")
+    public ResponseEntity<ApiResponse<DonorProfileResponse>> getDonorById(@PathVariable Long id) {
+        log.info("Admin request to fetch donor profile for ID: {}", id);
+        ApiResponse<DonorProfileResponse> response = adminService.getDonorById(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Admin: Get All Registered Hospitals", description = "Retrieves list of all registered hospitals with search, city, and status filters.")
+    @GetMapping("/hospitals")
+    public ResponseEntity<ApiResponse<List<HospitalResponse>>> getAllHospitals(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String status
+    ) {
+        log.info("Admin request to fetch all registered hospitals (search: {}, city: {}, status: {})", search, city, status);
+        ApiResponse<List<HospitalResponse>> response = adminService.getAllHospitals(search, city, status);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Admin: Get Hospital Details By ID", description = "Retrieves complete profile details for a specific hospital ID.")
+    @GetMapping("/hospitals/{id}")
+    public ResponseEntity<ApiResponse<HospitalResponse>> getHospitalById(@PathVariable Long id) {
+        log.info("Admin request to fetch hospital profile for ID: {}", id);
+        ApiResponse<HospitalResponse> response = adminService.getHospitalById(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Admin: Permanently Delete Hospital", description = "Permanently deletes a hospital profile, user account, and associated dependent records.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Hospital permanently deleted"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Hospital not found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Admin access required")
+    })
+    @org.springframework.web.bind.annotation.DeleteMapping("/hospitals/{id}")
+    public ResponseEntity<ApiResponse<String>> deleteHospital(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        String adminEmail = (userDetails != null && userDetails.getUsername() != null) ? userDetails.getUsername() : "admin@bloodbridge.com";
+        log.info("Admin {} request to permanently delete hospital ID: {}", adminEmail, id);
+        ApiResponse<String> response = adminService.deleteHospital(id, adminEmail);
         return ResponseEntity.ok(response);
     }
 }
