@@ -132,7 +132,7 @@ class DashboardServiceImplTest {
 
     @Test
     void getTopDonors_Success() {
-        Object[] row1 = new Object[]{"Sarah Donor", BloodGroup.A_POSITIVE, 12};
+        Object[] row1 = new Object[]{1L, 10L, "Sarah Donor", "sarah@example.com", "Hyderabad", "Telangana", BloodGroup.A_POSITIVE, 12};
         List<Object[]> rows = new ArrayList<>();
         rows.add(row1);
         when(donorProfileRepository.findTopDonors(any(Pageable.class))).thenReturn(rows);
@@ -141,7 +141,13 @@ class DashboardServiceImplTest {
 
         assertNotNull(topDonors);
         assertEquals(1, topDonors.size());
+        assertEquals(1L, topDonors.get(0).getId());
+        assertEquals(1L, topDonors.get(0).getDonorId());
+        assertEquals(10L, topDonors.get(0).getUserId());
         assertEquals("Sarah Donor", topDonors.get(0).getDonorName());
+        assertEquals("sarah@example.com", topDonors.get(0).getEmail());
+        assertEquals("Hyderabad", topDonors.get(0).getCity());
+        assertEquals("Telangana", topDonors.get(0).getState());
         assertEquals(BloodGroup.A_POSITIVE, topDonors.get(0).getBloodGroup());
         assertEquals(12, topDonors.get(0).getTotalDonations());
     }

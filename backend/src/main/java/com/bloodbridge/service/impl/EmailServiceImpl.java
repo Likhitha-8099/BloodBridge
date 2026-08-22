@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender mailSender;
+    private final com.bloodbridge.repository.EmailNotificationRepository emailNotificationRepository;
 
     @Value("${spring.mail.host:smtp.gmail.com}")
     private String mailHost;
@@ -31,11 +32,14 @@ public class EmailServiceImpl implements EmailService {
     @Value("${spring.mail.port:587}")
     private int mailPort;
 
-    @Value("${spring.mail.username:insurai2@gmail.com}")
+    @Value("${spring.mail.username:insureai2@gmail.com}")
     private String fromEmail;
 
     @Value("${spring.mail.password:}")
     private String mailPassword;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     private volatile String cachedEmergencyHtmlTemplate = null;
 
@@ -76,7 +80,7 @@ public class EmailServiceImpl implements EmailService {
 
     private final java.util.Set<String> processedEmailKeys = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-        @Override
+    @Override
     @Async("emergencyEmailExecutor")
     public void sendEmergencyAlert(EmergencyMailDto mailDto) {
         String recipientEmail = mailDto != null ? mailDto.getToEmail() : null;
@@ -94,30 +98,24 @@ public class EmailServiceImpl implements EmailService {
             }
         }
 
-        log.info("--------------------------------------------------------------------------------");
-        log.info("===> [EMAIL-PIPELINE] Emergency Alert Mail Dispatch Started");
-        log.info(" - Recipient Email : {}", recipientEmail);
-        log.info(" - Donor Name      : {}", donorName);
-        log.info(" - Sender Email    : {}", fromEmail);
-        log.info(" - Subject         : {}", subject);
-        log.info(" - Execution Thread: {}", Thread.currentThread().getName());
-        log.info("[EMAIL-EMERGENCY-QUEUE] Request ID: #{}, Donor: {} ({})", reqId != null ? reqId : "N/A", donorName, recipientEmail);
-
         if (mailDto == null || recipientEmail == null || recipientEmail.isBlank()) {
-            log.error("<=== [EMAIL-PIPELINE-ABORTED] Missing or blank recipient email address. MailDto: {}", mailDto);
-            log.error("[EMAIL-FAILURE] Email type: EMERGENCY_ALERT, Recipient: {}, Reason: Missing or blank email address", recipientEmail);
+            log.warn("[EMAIL-EMERGENCY-FAILED] Failed to send emergency request email: missing or blank recipient email for Request #{}, Donor #{}",
+                    reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
             return;
         }
 
+        long startTime = System.currentTimeMillis();
         try {
+            log.info("[EMAIL-EMERGENCY] Sending emergency request email to {} (Request #{}, Donor #{})",
+                    recipientEmail, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
+
             String htmlTemplate = getEmergencyHtmlTemplate();
             if (htmlTemplate == null || htmlTemplate.isBlank()) {
-                log.error("<=== [EMAIL-PIPELINE-ABORTED] Template 'templates/emergency-alert.html' NOT AVAILABLE!");
-                log.error("[EMAIL-FAILURE] Email type: EMERGENCY_ALERT, Recipient: {}, Reason: Emergency HTML template missing", recipientEmail);
+                log.error("[EMAIL-EMERGENCY-FAILED] Failed to send emergency request email to {}: emergency HTML template not available", recipientEmail);
+                recordEmailNotification(reqId, donorId, recipientEmail, false, 0, "Emergency HTML template missing");
                 return;
             }
 
-            log.info("[EMAIL-PIPELINE] Stage 2/4: Populating template variables...");
             String formattedBloodGroup = mailDto.getBloodGroup() != null ?
                     mailDto.getBloodGroup().replace("_POSITIVE", "+").replace("_NEGATIVE", "-") : "Emergency";
 
@@ -134,28 +132,59 @@ public class EmailServiceImpl implements EmailService {
                     .replace("{hospitalAddress}", mailDto.getHospitalAddress() != null ? mailDto.getHospitalAddress() : "See App Dashboard")
                     .replace("{requiredByDate}", mailDto.getRequiredByDate() != null ? mailDto.getRequiredByDate() : "Immediate")
                     .replace("{reason}", mailDto.getReason() != null ? mailDto.getReason() : "Emergency Requirement")
-                    .replace("{loginUrl}", mailDto.getLoginUrl() != null ? mailDto.getLoginUrl() : "http://localhost:5173/donor/requests");
+                    .replace("{loginUrl}", mailDto.getLoginUrl() != null ? mailDto.getLoginUrl() : (frontendUrl + "/donor/requests"));
 
-            log.info("[EMAIL-PIPELINE] Stage 3/4: Constructing MimeMessage...");
-            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insurai2@gmail.com";
+            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insureai2@gmail.com";
 
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, StandardCharsets.UTF_8.name());
 
             helper.setTo(recipientEmail);
             helper.setSubject(subject);
             helper.setFrom(senderEmail, "BloodBridge Team");
             helper.setText(htmlBody, true);
 
-            log.info("[EMAIL-PIPELINE] Stage 4/4: Transmitting email via JavaMailSender SMTP ({}:{})...", mailHost, mailPort);
             mailSender.send(mimeMessage);
+            long durationMs = System.currentTimeMillis() - startTime;
 
-            log.info("[EMAIL-EMERGENCY-SUCCESS] Request ID: #{}, Recipient: {}", reqId != null ? reqId : "N/A", recipientEmail);
-            log.info("<=== [EMAIL-PIPELINE-SUCCESS] Emergency HTML Email dispatched successfully via SMTP to: {}", recipientEmail);
-            log.info("--------------------------------------------------------------------------------");
+            log.info("[EMAIL-EMERGENCY-SUCCESS] Emergency request email successfully sent to {} (Request #{}, Donor #{})",
+                    recipientEmail, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
+
+            recordEmailNotification(reqId, donorId, recipientEmail, true, durationMs, null);
         } catch (Exception e) {
-            log.error("[EMAIL-FAILURE] Email type: EMERGENCY_ALERT, Recipient: {}, Reason: {}", recipientEmail, e.getMessage());
-            log.info("--------------------------------------------------------------------------------");
+            long durationMs = System.currentTimeMillis() - startTime;
+            log.error("[EMAIL-EMERGENCY-FAILED] Failed to send emergency request email to {} (Request #{}, Donor #{}): {}",
+                    recipientEmail, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A", e.getMessage(), e);
+
+            recordEmailNotification(reqId, donorId, recipientEmail, false, durationMs, e.getMessage());
+        }
+    }
+
+    private void recordEmailNotification(Long reqId, Long donorId, String email, boolean success, long durationMs, String failureReason) {
+        if (reqId == null || donorId == null || emailNotificationRepository == null) {
+            return;
+        }
+        try {
+            com.bloodbridge.entity.EmailNotification notif = emailNotificationRepository.findByEmergencyRequestIdAndDonorId(reqId, donorId)
+                    .orElseGet(() -> com.bloodbridge.entity.EmailNotification.builder()
+                            .emergencyRequestId(reqId)
+                            .donorId(donorId)
+                            .email(email)
+                            .deliveryAttempts(0)
+                            .build());
+
+            notif.setStatus(success ? com.bloodbridge.enums.EmailDeliveryStatus.SENT : com.bloodbridge.enums.EmailDeliveryStatus.FAILED);
+            notif.setDeliveryAttempts(notif.getDeliveryAttempts() + 1);
+            if (success) {
+                notif.setSentAt(java.time.LocalDateTime.now());
+                notif.setSmtpResponseTimeMs(durationMs);
+                notif.setFailureReason(null);
+            } else {
+                notif.setFailureReason(failureReason != null && failureReason.length() > 950 ? failureReason.substring(0, 950) : failureReason);
+            }
+            emailNotificationRepository.save(notif);
+        } catch (Exception ex) {
+            log.warn("[EMAIL-DB-WARN] Could not record email notification status for Request #{}, Donor #{}: {}", reqId, donorId, ex.getMessage());
         }
     }
 
@@ -195,7 +224,7 @@ public class EmailServiceImpl implements EmailService {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
-            message.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insurai2@gmail.com");
+            message.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insureai2@gmail.com");
             message.setSubject(subject);
             message.setText(content);
             mailSender.send(message);
@@ -308,7 +337,7 @@ public class EmailServiceImpl implements EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setTo(toEmail);
-            helper.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insurai2@gmail.com");
+            helper.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insureai2@gmail.com");
             helper.setSubject(subject);
             helper.setText(content);
 
@@ -367,7 +396,7 @@ public class EmailServiceImpl implements EmailService {
                     "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Status:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><span style=\"color: #2e7d32; font-weight: bold;\">ACCEPTED</span></td></tr>" +
                     "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Accepted At:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\">" + (acceptedAtStr != null ? acceptedAtStr : "Just now") + "</td></tr>" +
                     "</table>" +
-                    "<p style=\"margin-top: 25px;\"><a href=\"http://localhost:5173/hospital/dashboard\" style=\"background-color: #e53935; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;\">Open Hospital Dashboard</a></p>" +
+                    "<p style=\"margin-top: 25px;\"><a href=\"" + frontendUrl + "/hospital/dashboard\" style=\"background-color: #e53935; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;\">Open Hospital Dashboard</a></p>" +
                     "<hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">" +
                     "<p style=\"font-size: 12px; color: #777;\">BloodBridge Emergency Blood Network System Notification</p>" +
                     "</div></body></html>";
@@ -375,7 +404,7 @@ public class EmailServiceImpl implements EmailService {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insurai2@gmail.com";
+            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "insureai2@gmail.com";
             helper.setTo(toHospitalEmail);
             helper.setSubject(subject);
             helper.setFrom(senderEmail, "BloodBridge Network");

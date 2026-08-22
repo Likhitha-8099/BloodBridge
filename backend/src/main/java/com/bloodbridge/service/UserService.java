@@ -89,4 +89,20 @@ public interface UserService {
      * @return ApiResponse confirming account deactivation
      */
     ApiResponse<String> deactivateUser(Long id);
+
+    /**
+     * Admin: Permanently deletes a user account and associated records.
+     *
+     * @param id user ID
+     * @return ApiResponse confirming user deletion
+     */
+    ApiResponse<String> deleteUser(Long id);
+
+    /**
+     * Admin: Permanently deletes a donor profile, associated user account, and dependent records.
+     *
+     * @param donorId donor profile ID or user ID
+     * @return ApiResponse confirming donor deletion
+     */
+    ApiResponse<String> deleteDonor(Long donorId);
 }

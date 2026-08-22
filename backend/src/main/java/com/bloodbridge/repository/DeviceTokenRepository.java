@@ -51,6 +51,11 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> 
     @Query("DELETE FROM DeviceToken dt WHERE dt.fcmToken = :fcmToken")
     void deleteByFcmToken(@Param("fcmToken") String fcmToken);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("DELETE FROM DeviceToken dt WHERE dt.user = :user")
+    void deleteAllByUser(@Param("user") User user);
+
     /**
      * Soft-deactivate all tokens for a user (e.g. account deactivation).
      */

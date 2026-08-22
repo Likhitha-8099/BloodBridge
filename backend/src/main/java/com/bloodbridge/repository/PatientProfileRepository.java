@@ -23,6 +23,9 @@ public interface PatientProfileRepository extends JpaRepository<PatientProfile, 
      */
     Optional<PatientProfile> findByUserId(Long userId);
 
+    @org.springframework.data.jpa.repository.Query("SELECT p FROM PatientProfile p WHERE p.user.email = :email")
+    Optional<PatientProfile> findByEmail(@org.springframework.data.repository.query.Param("email") String email);
+
     /**
      * Check if a patient profile already exists for the specified user ID.
      *

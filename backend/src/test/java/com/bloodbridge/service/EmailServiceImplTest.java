@@ -26,6 +26,9 @@ class EmailServiceImplTest {
     @Mock
     private MimeMessage mimeMessage;
 
+    @Mock
+    private com.bloodbridge.repository.EmailNotificationRepository emailNotificationRepository;
+
     @InjectMocks
     private EmailServiceImpl emailService;
 

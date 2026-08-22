@@ -36,6 +36,21 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final com.bloodbridge.repository.DonorProfileRepository donorProfileRepository;
+    private final com.bloodbridge.repository.HospitalRepository hospitalRepository;
+    private final com.bloodbridge.repository.PatientProfileRepository patientProfileRepository;
+    private final com.bloodbridge.repository.NotificationPreferenceRepository notificationPreferenceRepository;
+    private final com.bloodbridge.repository.DeviceTokenRepository deviceTokenRepository;
+    private final com.bloodbridge.repository.MatchedEmergencyDonorRepository matchedEmergencyDonorRepository;
+    private final com.bloodbridge.repository.EmergencyResponseRepository emergencyResponseRepository;
+    private final com.bloodbridge.repository.MatchResultRepository matchResultRepository;
+    private final com.bloodbridge.repository.NotificationRepository notificationRepository;
+    private final com.bloodbridge.repository.PushDeliveryLogRepository pushDeliveryLogRepository;
+    private final com.bloodbridge.repository.DonorLiveLocationRepository donorLiveLocationRepository;
+    private final com.bloodbridge.repository.EmailNotificationRepository emailNotificationRepository;
+    private final com.bloodbridge.repository.DonationRepository donationRepository;
+    private final com.bloodbridge.repository.AuditLogRepository auditLogRepository;
+    private final com.bloodbridge.service.RealtimeService realtimeService;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final StorageService storageService;
@@ -195,6 +210,164 @@ public class UserServiceImpl implements UserService {
         log.info("Successfully deactivated user ID: {}", id);
 
         return ApiResponse.success("User account deactivated successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> deleteUser(Long id) {
+        log.info("Permanently deleting user ID: {}", id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
+
+        String email = user.getEmail();
+
+        try {
+            deviceTokenRepository.deleteAllByUser(user);
+        } catch (Exception ex) {
+            log.warn("Could not delete device tokens for user {}: {}", id, ex.getMessage());
+        }
+
+        try {
+            pushDeliveryLogRepository.deleteAllByUserId(id);
+        } catch (Exception ex) {
+            log.warn("Could not delete push delivery logs for user {}: {}", id, ex.getMessage());
+        }
+
+        try {
+            notificationPreferenceRepository.findByUserId(id).ifPresent(notificationPreferenceRepository::delete);
+        } catch (Exception ex) {
+            log.warn("Could not delete notification preferences for user {}: {}", id, ex.getMessage());
+        }
+
+        try {
+            notificationRepository.deleteAllByRecipientUserId(id);
+        } catch (Exception ex) {
+            log.warn("Could not delete recipient notifications for user {}: {}", id, ex.getMessage());
+        }
+
+        // Clean up Donor Profile if user was a donor
+        donorProfileRepository.findByUserId(id).ifPresent(dp -> {
+            Long dpId = dp.getId();
+            try { notificationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlinkDonorProfile failed: {}", ex.getMessage()); }
+            try { auditLogRepository.unlinkDonor(dpId); } catch (Exception ex) { log.warn("unlink donor audit logs failed: {}", ex.getMessage()); }
+            try { donorLiveLocationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete donor live locations failed: {}", ex.getMessage()); }
+            try { matchedEmergencyDonorRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete matched emergency donors failed: {}", ex.getMessage()); }
+            try { emergencyResponseRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete emergency responses failed: {}", ex.getMessage()); }
+            try { matchResultRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete match results failed: {}", ex.getMessage()); }
+            try { emailNotificationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete email notifications failed: {}", ex.getMessage()); }
+            try { donationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlink donations failed: {}", ex.getMessage()); }
+            try { donationRepository.unlinkDonorMatchResults(dpId); } catch (Exception ex) { log.warn("unlink donation match results failed: {}", ex.getMessage()); }
+            try { donorProfileRepository.delete(dp); } catch (Exception ex) { log.warn("delete donor profile failed: {}", ex.getMessage()); }
+        });
+
+        try {
+            hospitalRepository.findByUserId(id).ifPresent(hospitalRepository::delete);
+        } catch (Exception ex) {
+            log.warn("Could not delete hospital profile for user {}: {}", id, ex.getMessage());
+        }
+
+        try {
+            patientProfileRepository.findByUserId(id).ifPresent(patientProfileRepository::delete);
+        } catch (Exception ex) {
+            log.warn("Could not delete patient profile for user {}: {}", id, ex.getMessage());
+        }
+
+        try { auditLogRepository.unlinkUser(id); } catch (Exception ex) { log.warn("unlink user audit logs failed: {}", ex.getMessage()); }
+
+        userRepository.delete(user);
+
+        auditLoggerService.logEvent("USER_DELETED", email, "User ID " + id + " permanently deleted");
+        try {
+            realtimeService.publishAdminUsersUpdate(com.bloodbridge.dto.RealtimeEventDTO.builder().eventType(com.bloodbridge.enums.RealtimeEventType.USER_DELETED).message("User deleted").build());
+            realtimeService.publishAdminDashboardUpdate(com.bloodbridge.dto.RealtimeEventDTO.builder().eventType(com.bloodbridge.enums.RealtimeEventType.USER_DELETED).message("User deleted").build());
+        } catch (Exception ignored) {}
+
+        log.info("Successfully deleted user ID: {}", id);
+
+        return ApiResponse.success("User deleted successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> deleteDonor(Long donorId) {
+        log.info("Permanently deleting donor with identifier ID: {}", donorId);
+
+        com.bloodbridge.entity.DonorProfile donorProfile = donorProfileRepository.findById(donorId)
+                .or(() -> donorProfileRepository.findByUserId(donorId))
+                .orElse(null);
+
+        User user = null;
+        if (donorProfile != null && donorProfile.getUser() != null) {
+            user = donorProfile.getUser();
+        } else {
+            user = userRepository.findById(donorId).orElse(null);
+            if (user != null && donorProfile == null) {
+                donorProfile = donorProfileRepository.findByUserId(user.getId()).orElse(null);
+            }
+        }
+
+        if (donorProfile == null && user == null) {
+            throw new UserNotFoundException("Donor not found with ID: " + donorId);
+        }
+
+        String userEmail = user != null ? user.getEmail() : (donorProfile != null ? donorProfile.getEmail() : "unknown");
+        Long userId = user != null ? user.getId() : (donorProfile != null && donorProfile.getUser() != null ? donorProfile.getUser().getId() : null);
+        Long dpId = donorProfile != null ? donorProfile.getId() : null;
+
+        // 1. Cleanup all donor profile dependencies
+        if (dpId != null) {
+            log.info("Cleaning up donor profile ID: {}", dpId);
+            try { notificationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlinkDonorProfile error: {}", ex.getMessage()); }
+            try { auditLogRepository.unlinkDonor(dpId); } catch (Exception ex) { log.warn("unlink donor audit logs error: {}", ex.getMessage()); }
+            try { donorLiveLocationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete donor live locations error: {}", ex.getMessage()); }
+            try { matchedEmergencyDonorRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete matched emergency donors error: {}", ex.getMessage()); }
+            try { emergencyResponseRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete emergency responses error: {}", ex.getMessage()); }
+            try { emailNotificationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete email notifications error: {}", ex.getMessage()); }
+
+            try { donationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlink donations error: {}", ex.getMessage()); }
+            try { donationRepository.unlinkDonorMatchResults(dpId); } catch (Exception ex) { log.warn("unlink donation match results error: {}", ex.getMessage()); }
+            try { matchResultRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete match results error: {}", ex.getMessage()); }
+
+            try {
+                donorProfileRepository.delete(donorProfile);
+                donorProfileRepository.flush();
+            } catch (Exception ex) {
+                log.error("Failed to delete donor profile entity: {}", ex.getMessage());
+                throw ex;
+            }
+        }
+
+        // 2. Cleanup user entity and user dependencies
+        if (user != null || userId != null) {
+            User targetUser = user != null ? user : userRepository.findById(userId).orElse(null);
+            if (targetUser != null) {
+                Long targetUid = targetUser.getId();
+                log.info("Cleaning up user entity ID: {} ({})", targetUid, targetUser.getEmail());
+
+                try { pushDeliveryLogRepository.deleteAllByUserId(targetUid); } catch (Exception ex) { log.warn("delete push delivery logs error: {}", ex.getMessage()); }
+                try { deviceTokenRepository.deleteAllByUser(targetUser); } catch (Exception ex) { log.warn("delete device tokens error: {}", ex.getMessage()); }
+                try { notificationPreferenceRepository.findByUserId(targetUid).ifPresent(notificationPreferenceRepository::delete); } catch (Exception ex) { log.warn("delete notif prefs error: {}", ex.getMessage()); }
+                try { notificationRepository.deleteAllByRecipientUserId(targetUid); } catch (Exception ex) { log.warn("delete user notifications error: {}", ex.getMessage()); }
+                try { auditLogRepository.unlinkUser(targetUid); } catch (Exception ex) { log.warn("unlink user audit logs error: {}", ex.getMessage()); }
+
+                try {
+                    userRepository.delete(targetUser);
+                    userRepository.flush();
+                } catch (Exception ex) {
+                    log.error("Failed to delete user entity: {}", ex.getMessage());
+                    throw ex;
+                }
+            }
+        }
+
+        auditLoggerService.logEvent("DONOR_DELETED", userEmail, "Donor ID " + donorId + " (" + userEmail + ") permanently deleted");
+        try {
+            realtimeService.publishAdminUsersUpdate(com.bloodbridge.dto.RealtimeEventDTO.builder().eventType(com.bloodbridge.enums.RealtimeEventType.USER_DELETED).message("Donor deleted").build());
+            realtimeService.publishAdminDashboardUpdate(com.bloodbridge.dto.RealtimeEventDTO.builder().eventType(com.bloodbridge.enums.RealtimeEventType.USER_DELETED).message("Donor deleted").build());
+        } catch (Exception ignored) {}
+
+        log.info("Successfully deleted donor ID: {} ({})", donorId, userEmail);
+        return ApiResponse.success("Donor permanently deleted successfully");
     }
 
     private User findUserByEmail(String email) {

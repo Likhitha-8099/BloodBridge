@@ -30,4 +30,8 @@ public interface EmailNotificationRepository extends JpaRepository<EmailNotifica
 
     @Query("SELECT AVG(e.smtpResponseTimeMs) FROM EmailNotification e WHERE e.emergencyRequestId = :requestId AND e.status = 'SENT'")
     Double findAverageSmtpTimeMsByEmergencyRequestId(@Param("requestId") Long requestId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM EmailNotification e WHERE e.donorId = :donorId")
+    void deleteAllByDonorId(@Param("donorId") Long donorId);
 }

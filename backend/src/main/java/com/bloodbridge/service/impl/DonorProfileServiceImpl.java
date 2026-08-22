@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service implementation for Donor Management & Smart Donor Portal workflows.
@@ -56,6 +57,7 @@ public class DonorProfileServiceImpl implements DonorProfileService {
     private final DonorProfileMapper donorProfileMapper;
     private final AuditLoggerService auditLoggerService;
     private final com.bloodbridge.config.MatchingConfig matchingConfig;
+    private final com.bloodbridge.service.UserService userService;
 
     @Override
     @Transactional
@@ -85,9 +87,44 @@ public class DonorProfileServiceImpl implements DonorProfileService {
             throw new DonorProfileAlreadyExistsException("Donor profile already exists for user: " + email);
         }
 
-        if (donorProfileRepository.existsByEmail(targetEmail)) {
-            log.warn("Donor profile creation failed: Email already registered for another donor profile: {}", targetEmail);
-            throw new DonorProfileAlreadyExistsException("Email address already registered to another donor: " + targetEmail);
+        Optional<DonorProfile> existingByEmail = donorProfileRepository.findByEmail(targetEmail);
+        if (existingByEmail.isPresent()) {
+            DonorProfile existingProfile = existingByEmail.get();
+            if (existingProfile.getUser() != null && !existingProfile.getUser().getId().equals(user.getId()) && Boolean.TRUE.equals(existingProfile.getUser().getActive())) {
+                log.warn("Donor profile creation failed: Email already registered for another active donor profile: {}", targetEmail);
+                throw new DonorProfileAlreadyExistsException("Email address already registered to another donor: " + targetEmail);
+            }
+            existingProfile.setUser(user);
+            existingProfile.setEmail(targetEmail);
+            if (request.getBloodGroup() != null) {
+                existingProfile.setBloodGroup(request.getBloodGroup());
+                existingProfile.setRhFactor(request.getBloodGroup().name().contains("POSITIVE") ? "POSITIVE" : "NEGATIVE");
+            }
+            if (request.getAge() != null) existingProfile.setAge(request.getAge());
+            if (request.getGender() != null) existingProfile.setGender(request.getGender());
+            if (request.getDateOfBirth() != null) existingProfile.setDateOfBirth(request.getDateOfBirth());
+            if (request.getCity() != null) existingProfile.setCity(request.getCity());
+            if (request.getState() != null) existingProfile.setState(request.getState());
+            if (request.getWeight() != null) existingProfile.setWeight(request.getWeight());
+            if (request.getHeight() != null) existingProfile.setHeight(request.getHeight());
+            if (request.getMedicalConditions() != null) existingProfile.setMedicalConditions(request.getMedicalConditions());
+            if (request.getCurrentMedications() != null) existingProfile.setCurrentMedications(request.getCurrentMedications());
+            if (request.getPreferredDonationRadius() != null) existingProfile.setPreferredDonationRadius(request.getPreferredDonationRadius());
+            if (request.getLatitude() != null) existingProfile.setLatitude(request.getLatitude());
+            if (request.getLongitude() != null) existingProfile.setLongitude(request.getLongitude());
+            if (request.getEmergencyAvailable() != null) existingProfile.setEmergencyAvailable(request.getEmergencyAvailable());
+            existingProfile.setStatus("ACTIVE");
+            existingProfile.setAvailableForDonation(true);
+            EligibilityResponse eligibility = computeEligibility(existingProfile);
+            existingProfile.setNextEligibleDate(eligibility.getNextEligibleDate());
+            existingProfile.setDonorScore(calculateSmartDonorScore(existingProfile));
+            DonorProfile savedProfile = donorProfileRepository.save(existingProfile);
+
+            auditLoggerService.logEvent("DONOR_REGISTERED", targetEmail, "Donor profile updated with blood group: " + savedProfile.getBloodGroup());
+            log.info("Donor profile updated successfully with ID: {}", savedProfile.getId());
+
+            DonorProfileResponse response = donorProfileMapper.toResponse(savedProfile, eligibility.getStatus(), eligibility.getNextEligibleDate());
+            return ApiResponse.success("Donor profile created successfully", response);
         }
 
         DonorProfile profile = donorProfileMapper.toEntity(request, user);
@@ -333,10 +370,23 @@ public class DonorProfileServiceImpl implements DonorProfileService {
         profile.setEmergencyAvailable(false);
         donorProfileRepository.save(profile);
 
+        if (profile.getUser() != null) {
+            User user = profile.getUser();
+            user.setActive(false);
+            userRepository.save(user);
+        }
+
         auditLoggerService.logEvent("DONOR_PROFILE_DEACTIVATED", email, "Donor profile soft deleted");
         log.info("Successfully deactivated donor profile for ID: {}", profile.getId());
 
         return ApiResponse.success("Donor profile deactivated successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> deleteDonorById(Long id) {
+        log.info("Admin permanently deleting donor ID: {}", id);
+        return userService.deleteDonor(id);
     }
 
     // ==========================================

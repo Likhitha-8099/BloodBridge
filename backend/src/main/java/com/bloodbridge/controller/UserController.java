@@ -175,4 +175,18 @@ public class UserController {
         ApiResponse<String> response = userService.deactivateUser(id);
         return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "Admin: Delete User Account", description = "Permanently deletes a user and cleanly removes associated profile records.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User deleted successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "User not found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<String>> deleteUser(@PathVariable Long id) {
+        log.info("Admin request to delete user ID: {}", id);
+        ApiResponse<String> response = userService.deleteUser(id);
+        return ResponseEntity.ok(response);
+    }
 }

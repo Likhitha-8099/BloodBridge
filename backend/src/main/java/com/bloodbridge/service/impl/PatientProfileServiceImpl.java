@@ -37,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -79,6 +80,41 @@ public class PatientProfileServiceImpl implements PatientProfileService {
         Hospital hospital = null;
         if (request.getHospitalId() != null) {
             hospital = hospitalRepository.findById(request.getHospitalId()).orElse(null);
+        }
+
+        Optional<PatientProfile> existingByEmail = patientProfileRepository.findByEmail(email);
+        if (existingByEmail.isPresent()) {
+            PatientProfile existingProfile = existingByEmail.get();
+            if (existingProfile.getUser() != null && !existingProfile.getUser().getId().equals(user.getId()) && Boolean.TRUE.equals(existingProfile.getUser().getActive())) {
+                log.warn("Patient profile creation failed: Profile already exists for user: {}", email);
+                throw new PatientProfileAlreadyExistsException("Patient profile already exists for user: " + email);
+            }
+            existingProfile.setUser(user);
+            existingProfile.setStatus("ACTIVE");
+            if (request.getAge() != null) existingProfile.setAge(request.getAge());
+            if (request.getGender() != null) existingProfile.setGender(request.getGender());
+            if (request.getBloodGroup() != null) existingProfile.setBloodGroup(request.getBloodGroup());
+            if (request.getRhFactor() != null) existingProfile.setRhFactor(request.getRhFactor());
+            if (request.getWeight() != null) existingProfile.setWeight(request.getWeight());
+            if (request.getMedicalCondition() != null) existingProfile.setMedicalCondition(request.getMedicalCondition());
+            if (request.getDiagnosis() != null) existingProfile.setDiagnosis(request.getDiagnosis());
+            if (request.getDoctorName() != null) existingProfile.setDoctorName(request.getDoctorName());
+            if (hospital != null) existingProfile.setHospital(hospital);
+            if (request.getEmergencyContactName() != null) existingProfile.setEmergencyContactName(request.getEmergencyContactName());
+            if (request.getEmergencyContactNumber() != null) existingProfile.setEmergencyContactNumber(request.getEmergencyContactNumber());
+            if (request.getRelationship() != null) existingProfile.setRelationship(request.getRelationship());
+            if (request.getAddress() != null) existingProfile.setAddress(request.getAddress());
+            if (request.getCity() != null) existingProfile.setCity(request.getCity());
+            if (request.getState() != null) existingProfile.setState(request.getState());
+            if (request.getCountry() != null) existingProfile.setCountry(request.getCountry());
+            if (request.getPostalCode() != null) existingProfile.setPostalCode(request.getPostalCode());
+            if (request.getLatitude() != null) existingProfile.setLatitude(request.getLatitude());
+            if (request.getLongitude() != null) existingProfile.setLongitude(request.getLongitude());
+            if (request.getPreferredHospital() != null) existingProfile.setPreferredHospital(request.getPreferredHospital());
+            if (request.getMedicalHistory() != null) existingProfile.setMedicalHistory(request.getMedicalHistory());
+            PatientProfile savedProfile = patientProfileRepository.save(existingProfile);
+            auditLoggerService.logEvent("PATIENT_REGISTERED", email, "Patient profile updated with code: " + savedProfile.getPatientCode());
+            return ApiResponse.success("Patient profile created successfully", patientProfileMapper.toResponse(savedProfile));
         }
 
         PatientProfile profile = patientProfileMapper.toEntity(request, user, hospital);
@@ -129,6 +165,12 @@ public class PatientProfileServiceImpl implements PatientProfileService {
 
         profile.setStatus("DEACTIVATED");
         patientProfileRepository.save(profile);
+
+        if (profile.getUser() != null) {
+            User user = profile.getUser();
+            user.setActive(false);
+            userRepository.save(user);
+        }
 
         auditLoggerService.logEvent("PATIENT_PROFILE_DEACTIVATED", email, "Patient profile soft deleted");
         log.info("Successfully deactivated patient profile for ID: {}", profile.getId());

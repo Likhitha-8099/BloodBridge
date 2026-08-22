@@ -22,7 +22,7 @@ public class AuditLoggerServiceImpl implements AuditLoggerService {
     private final AuditLogRepository auditLogRepository;
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void logEvent(String action, String email, String details) {
         log.info("[AUDIT EVENT] Timestamp: {} | Action: {} | User: {} | Context: {}",
                 LocalDateTime.now(), action, email, details);

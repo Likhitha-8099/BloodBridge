@@ -16,7 +16,15 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class TopDonorResponse {
+    private Long id;
+    private Long donorId;
+    private Long userId;
     private String donorName;
+    private String email;
+    private String city;
+    private String state;
+    private String role;
     private BloodGroup bloodGroup;
     private Integer totalDonations;
 }
+

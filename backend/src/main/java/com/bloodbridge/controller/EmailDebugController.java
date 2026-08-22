@@ -41,11 +41,14 @@ public class EmailDebugController {
     @Value("${spring.mail.port:587}")
     private int mailPort;
 
-    @Value("${spring.mail.username:insurai2@gmail.com}")
+    @Value("${spring.mail.username:insureai2@gmail.com}")
     private String mailUsername;
 
     @Value("${spring.mail.password:}")
     private String mailPassword;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     @PostConstruct
     public void init() {
@@ -140,7 +143,7 @@ public class EmailDebugController {
                     .replace("{hospitalAddress}", "123 Healthcare Ave")
                     .replace("{requiredByDate}", "Immediate")
                     .replace("{reason}", "SMTP Diagnostic Verification")
-                    .replace("{loginUrl}", "http://localhost:5173/login");
+                    .replace("{loginUrl}", frontendUrl + "/login");
             report.put("templateLoaded", true);
             log.info("Stage 2: Template loaded successfully ({} chars)", htmlBody.length());
         } catch (Exception e) {
@@ -184,7 +187,7 @@ public class EmailDebugController {
                     .state("Test State")
                     .requiredByDate("Immediate")
                     .reason("Async Pipeline Test")
-                    .loginUrl("http://localhost:5173/login")
+                    .loginUrl(frontendUrl + "/login")
                     .build();
             emailService.sendEmergencyAlert(mailDto);
 

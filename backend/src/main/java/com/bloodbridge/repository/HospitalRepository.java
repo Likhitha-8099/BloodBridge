@@ -31,6 +31,30 @@ public interface HospitalRepository extends JpaRepository<Hospital, Long> {
     boolean existsByUserId(Long userId);
 
     /**
+     * Find a hospital profile by email.
+     *
+     * @param email the email address
+     * @return an {@link Optional} containing the hospital if found
+     */
+    Optional<Hospital> findByEmail(String email);
+
+    /**
+     * Check if a hospital exists with the given email.
+     *
+     * @param email the email address
+     * @return true if exists
+     */
+    boolean existsByEmail(String email);
+
+    /**
+     * Find a hospital by registration number.
+     *
+     * @param registrationNumber the registration number
+     * @return an {@link Optional} containing the hospital if found
+     */
+    Optional<Hospital> findByRegistrationNumber(String registrationNumber);
+
+    /**
      * Check if a hospital is already registered with the specified registration number.
      *
      * @param registrationNumber the registration number to check

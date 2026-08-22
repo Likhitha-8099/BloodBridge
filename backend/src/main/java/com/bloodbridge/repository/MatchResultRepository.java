@@ -3,6 +3,9 @@ package com.bloodbridge.repository;
 import com.bloodbridge.entity.MatchResult;
 import com.bloodbridge.enums.MatchStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -93,4 +96,10 @@ public interface MatchResultRepository extends JpaRepository<MatchResult, Long> 
      * Counts matches for a donor by match status.
      */
     long countByDonorIdAndStatus(Long donorId, MatchStatus status);
+
+    long countByBloodRequestIdAndStatus(Long bloodRequestId, MatchStatus status);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM MatchResult mr WHERE mr.donor.id = :donorId")
+    void deleteAllByDonorId(@Param("donorId") Long donorId);
 }

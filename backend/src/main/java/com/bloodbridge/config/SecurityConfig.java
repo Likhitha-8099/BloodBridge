@@ -77,16 +77,39 @@ public class SecurityConfig {
         return http.build();
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8083}")
+    private String allowedOrigins;
+
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
+
     /**
-     * Defines basic CORS configuration allowing common HTTP methods and headers from any origin.
-     * Supports credentials for SockJS WebSocket handshake.
+     * Configures CORS using configured origin patterns from properties and environment.
+     * Supports credentials for SockJS WebSocket handshake and REST API interactions.
      *
      * @return the CORS configuration source
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        
+        java.util.Set<String> originPatterns = new java.util.LinkedHashSet<>();
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            for (String origin : allowedOrigins.split(",")) {
+                String trimmed = origin.trim();
+                if (!trimmed.isEmpty()) {
+                    originPatterns.add(trimmed);
+                }
+            }
+        }
+        if (frontendUrl != null && !frontendUrl.isBlank()) {
+            originPatterns.add(frontendUrl.trim());
+        }
+        if (originPatterns.isEmpty()) {
+            originPatterns.add("*");
+        }
+
+        configuration.setAllowedOriginPatterns(new java.util.ArrayList<>(originPatterns));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
