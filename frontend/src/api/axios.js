@@ -1,8 +1,19 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
+const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8083/api/v1';
+  let cleaned = envUrl.trim().replace(/\/+$/, '');
+  // Normalize base URL: if root URL is provided (e.g. https://bloodbridge-backend-cun1.onrender.com),
+  // ensure /api/v1 is appended so endpoints like '/auth/login' resolve to '/api/v1/auth/login'.
+  if (!cleaned.endsWith('/api/v1') && !cleaned.endsWith('/api')) {
+    cleaned = `${cleaned}/api/v1`;
+  }
+  return cleaned;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8083/api/v1',
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },

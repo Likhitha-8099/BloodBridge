@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShieldAlert, Moon, Bell, Mail, Smartphone, MessageSquare, Award, Clock } from 'lucide-react';
 import Button from '../ui/Button';
+import api from '../../api/axios';
 
 /**
  * Modal dialog component for configuring Notification Delivery Preferences and Quiet Hours.
@@ -33,16 +34,9 @@ export default function NotificationPreferencesModal({ isOpen, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/v1/preferences', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const json = await response.json();
-        const data = json.data || json;
+      const response = await api.get('/preferences');
+      const data = response.data?.data || response.data;
+      if (data) {
         setPreferences({
           emailEnabled: data.emailEnabled ?? true,
           pushEnabled: data.pushEnabled ?? true,
@@ -69,24 +63,13 @@ export default function NotificationPreferencesModal({ isOpen, onClose }) {
     setSaved(false);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
       const payload = { ...preferences, emergencyAlertsEnabled: true };
-      const response = await fetch('/api/v1/preferences', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      if (response.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
-      } else {
-        setError('Failed to save preferences.');
-      }
-    } catch {
-      setError('Network error saving preferences.');
+      await api.put('/preferences', payload);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error('Error saving preferences:', err);
+      setError('Failed to save preferences.');
     } finally {
       setLoading(false);
     }
