@@ -39,6 +39,9 @@ public class FirebaseDebugController {
     @Value("${firebase.enabled:false}")
     private boolean firebaseEnabled;
 
+    @Value("${firebase.service-account-base64:${FIREBASE_SERVICE_ACCOUNT_BASE64:}}")
+    private String serviceAccountBase64;
+
     @Value("${firebase.service-account-json:${FIREBASE_SERVICE_ACCOUNT_JSON:}}")
     private String serviceAccountJson;
 
@@ -74,19 +77,29 @@ public class FirebaseDebugController {
         status.put("project_id_configured", projectIdSet);
         status.put("project_id_value", projectIdSet ? projectId : "<AUTO-RESOLVE>");
 
-        // ── 3. Credentials resolution (ENV VAR or LOCAL FILE or CLASSPATH) ───
+        // ── 3. Credentials resolution (ENV BASE64, ENV JSON, LOCAL FILE, or CLASSPATH) ───
+        String resolvedBase64 = getEffectiveServiceAccountBase64();
+        boolean base64Configured = resolvedBase64 != null && !resolvedBase64.trim().isEmpty();
+
         String resolvedJson = getEffectiveServiceAccountJson();
         boolean jsonStringConfigured = resolvedJson != null && !resolvedJson.trim().isEmpty();
+
         Path jsonPath = Paths.get(serviceAccountPath != null ? serviceAccountPath.trim() : "").toAbsolutePath();
         boolean jsonFileExists = Files.exists(jsonPath);
         boolean classpathResourceExists = getClass().getClassLoader().getResource("firebase/firebase-service-account.json") != null;
 
+        status.put("service_account_base64_env_configured", base64Configured);
         status.put("service_account_json_env_configured", jsonStringConfigured);
         status.put("service_account_path_configured", serviceAccountPath != null && !serviceAccountPath.isBlank());
         status.put("service_account_file_found", jsonFileExists);
         status.put("service_account_resolved_path", jsonPath.toString());
         status.put("service_account_classpath_found", classpathResourceExists);
-        status.put("credentials_source", jsonStringConfigured ? "ENVIRONMENT_VARIABLE" : (jsonFileExists ? "LOCAL_FILE" : (classpathResourceExists ? "CLASSPATH" : "NONE")));
+
+        String credSource = base64Configured ? "ENV_BASE64" :
+                (jsonStringConfigured ? "ENV_JSON" :
+                (jsonFileExists ? "LOCAL_FILE" :
+                (classpathResourceExists ? "LOCAL_FILE (classpath)" : "NONE")));
+        status.put("credentials_source", credSource);
 
         // ── 4. Is FirebaseApp initialized in the JVM? ─────────────────────────
         boolean firebaseAppReady = !FirebaseApp.getApps().isEmpty();
@@ -106,7 +119,7 @@ public class FirebaseDebugController {
         status.put("firebase_messaging_bean_available", messagingBeanPresent);
 
         // ── 6. Overall readiness ───────────────────────────────────────────────
-        boolean credentialsFound = jsonStringConfigured || jsonFileExists || classpathResourceExists;
+        boolean credentialsFound = base64Configured || jsonStringConfigured || jsonFileExists || classpathResourceExists;
         boolean allReady = firebaseEnabled && credentialsFound && firebaseAppReady && messagingBeanPresent;
         status.put("overall_status", allReady ? "READY ✔" : "NOT READY — Check items above");
 
@@ -117,7 +130,7 @@ public class FirebaseDebugController {
                 nextSteps.put("step_1", "Set FIREBASE_ENABLED=true in your environment variables / .env");
             }
             if (!credentialsFound) {
-                nextSteps.put("step_2", "Set FIREBASE_SERVICE_ACCOUNT_JSON in environment variables OR place firebase-service-account.json at: " + jsonPath);
+                nextSteps.put("step_2", "Set FIREBASE_SERVICE_ACCOUNT_BASE64 in environment variables OR place firebase-service-account.json at: " + jsonPath);
             }
             if (!firebaseAppReady) {
                 nextSteps.put("step_3", "FirebaseApp not initialized — fix credentials configuration first");
@@ -131,6 +144,21 @@ public class FirebaseDebugController {
         log.info("[Firebase-Debug] Status check complete. Overall: {}", allReady ? "READY" : "NOT READY");
 
         return ResponseEntity.ok(ApiResponse.success("Firebase health check complete", status));
+    }
+
+    private String getEffectiveServiceAccountBase64() {
+        if (serviceAccountBase64 != null && !serviceAccountBase64.trim().isEmpty()) {
+            return serviceAccountBase64;
+        }
+        String env = System.getenv("FIREBASE_SERVICE_ACCOUNT_BASE64");
+        if (env != null && !env.trim().isEmpty()) {
+            return env;
+        }
+        String prop = System.getProperty("FIREBASE_SERVICE_ACCOUNT_BASE64");
+        if (prop != null && !prop.trim().isEmpty()) {
+            return prop;
+        }
+        return null;
     }
 
     private String getEffectiveServiceAccountJson() {
