@@ -4,7 +4,7 @@
  * Phase 3B: Background push notification handler.
  *
  * This Service Worker MUST be placed in the /public directory so Vite
- * serves it at the root path: http://localhost:5173/firebase-messaging-sw.js
+ * serves it at the root path: /firebase-messaging-sw.js
  *
  * WHY this file is required:
  * Firebase Cloud Messaging uses Service Workers to receive and display
