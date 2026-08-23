@@ -1,0 +1,17 @@
+target/
+.git/
+.gitignore
+.env
+.env.*
+.env.local
+run-backend.ps1
+*.log
+.vscode/
+.idea/
+.settings/
+.classpath
+.project
+.factorypath
+src/main/resources/firebase/firebase-service-account.json
+**/firebase-service-account.json
+*-adminsdk-*.json
