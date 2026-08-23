@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Seeds default data into the database when the application starts.
@@ -39,34 +40,26 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // Startup Validation & Schema Migration Guard: Convert MySQL ENUMs to production-ready VARCHAR
-        try {
-            if (jdbcTemplate != null) {
-                jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN notification_type VARCHAR(50) NOT NULL");
-                jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN delivery_channel VARCHAR(30) NOT NULL");
-                jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN status VARCHAR(20) NOT NULL");
-                jdbcTemplate.execute("ALTER TABLE match_results MODIFY COLUMN compatibility_score DOUBLE NULL");
-                jdbcTemplate.execute("ALTER TABLE audit_logs MODIFY COLUMN timestamp DATETIME NULL");
-                try {
-                    jdbcTemplate.execute("ALTER TABLE donations ADD COLUMN completed_at DATETIME NULL");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN match_result_id BIGINT NULL");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN patient_profile_id BIGINT NULL");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN donor_profile_id BIGINT NULL");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN hospital_id BIGINT NULL");
-                } catch (Exception ignored) {}
-                log.info("Startup Validation: Successfully aligned notifications, match_results, audit_logs, and donations table schema.");
+        // Run database schema alignment asynchronously so it never blocks Tomcat webserver port binding
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (jdbcTemplate != null) {
+                    jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN notification_type VARCHAR(50) NOT NULL");
+                    jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN delivery_channel VARCHAR(30) NOT NULL");
+                    jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN status VARCHAR(20) NOT NULL");
+                    jdbcTemplate.execute("ALTER TABLE match_results MODIFY COLUMN compatibility_score DOUBLE NULL");
+                    jdbcTemplate.execute("ALTER TABLE audit_logs MODIFY COLUMN timestamp DATETIME NULL");
+                    try { jdbcTemplate.execute("ALTER TABLE donations ADD COLUMN completed_at DATETIME NULL"); } catch (Exception ignored) {}
+                    try { jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN match_result_id BIGINT NULL"); } catch (Exception ignored) {}
+                    try { jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN patient_profile_id BIGINT NULL"); } catch (Exception ignored) {}
+                    try { jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN donor_profile_id BIGINT NULL"); } catch (Exception ignored) {}
+                    try { jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN hospital_id BIGINT NULL"); } catch (Exception ignored) {}
+                    log.info("[Startup Validation] Successfully aligned notifications, match_results, audit_logs, and donations table schema.");
+                }
+            } catch (Exception e) {
+                log.warn("[Startup Validation Warning] Schema alignment skipped: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("Startup Validation Warning: Schema alignment skipped: {}", e.getMessage());
-        }
+        });
 
         if (adminSeedEnabled) {
             String targetEmail = (adminEmail != null && !adminEmail.isBlank()) ? adminEmail.trim().toLowerCase() : "admin@bloodbridge.com";
