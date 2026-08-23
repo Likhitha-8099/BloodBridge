@@ -39,10 +39,13 @@ public class FirebaseDebugController {
     @Value("${firebase.enabled:false}")
     private boolean firebaseEnabled;
 
-    @Value("${firebase.service-account-path:src/main/resources/firebase/firebase-service-account.json}")
+    @Value("${firebase.service-account-json:${FIREBASE_SERVICE_ACCOUNT_JSON:}}")
+    private String serviceAccountJson;
+
+    @Value("${firebase.service-account-path:${FIREBASE_SERVICE_ACCOUNT_PATH:src/main/resources/firebase/firebase-service-account.json}}")
     private String serviceAccountPath;
 
-    @Value("${firebase.project-id:}")
+    @Value("${firebase.project-id:${FIREBASE_PROJECT_ID:}}")
     private String projectId;
 
     private final ApplicationContext applicationContext;
@@ -69,15 +72,18 @@ public class FirebaseDebugController {
         // ── 2. Is Project ID set? (show value — it's not secret) ──────────────
         boolean projectIdSet = projectId != null && !projectId.isBlank();
         status.put("project_id_configured", projectIdSet);
-        status.put("project_id_value", projectIdSet ? projectId : "<NOT CONFIGURED>");
+        status.put("project_id_value", projectIdSet ? projectId : "<AUTO-RESOLVE>");
 
-        // ── 3. Does the Service Account JSON file exist on disk? ──────────────
-        Path jsonPath = Paths.get(serviceAccountPath).toAbsolutePath();
+        // ── 3. Credentials resolution (ENV VAR or LOCAL FILE) ─────────────────
+        boolean jsonStringConfigured = serviceAccountJson != null && !serviceAccountJson.trim().isEmpty();
+        Path jsonPath = Paths.get(serviceAccountPath != null ? serviceAccountPath.trim() : "").toAbsolutePath();
         boolean jsonFileExists = Files.exists(jsonPath);
+
+        status.put("service_account_json_env_configured", jsonStringConfigured);
         status.put("service_account_path_configured", serviceAccountPath != null && !serviceAccountPath.isBlank());
-        status.put("service_account_json_found", jsonFileExists);
-        // Only show the path (not file contents) — safe to expose
+        status.put("service_account_file_found", jsonFileExists);
         status.put("service_account_resolved_path", jsonPath.toString());
+        status.put("credentials_source", jsonStringConfigured ? "ENVIRONMENT_VARIABLE" : (jsonFileExists ? "LOCAL_FILE" : "NONE"));
 
         // ── 4. Is FirebaseApp initialized in the JVM? ─────────────────────────
         boolean firebaseAppReady = !FirebaseApp.getApps().isEmpty();
@@ -97,17 +103,25 @@ public class FirebaseDebugController {
         status.put("firebase_messaging_bean_available", messagingBeanPresent);
 
         // ── 6. Overall readiness ───────────────────────────────────────────────
-        boolean allReady = firebaseEnabled && projectIdSet && jsonFileExists && firebaseAppReady && messagingBeanPresent;
+        boolean credentialsFound = jsonStringConfigured || jsonFileExists;
+        boolean allReady = firebaseEnabled && credentialsFound && firebaseAppReady && messagingBeanPresent;
         status.put("overall_status", allReady ? "READY ✔" : "NOT READY — Check items above");
 
         // ── 7. Guidance if not ready ───────────────────────────────────────────
         if (!allReady) {
             Map<String, String> nextSteps = new LinkedHashMap<>();
-            if (!firebaseEnabled)    nextSteps.put("step_1", "Set FIREBASE_ENABLED=true in backend/.env");
-            if (!projectIdSet)       nextSteps.put("step_2", "Set FIREBASE_PROJECT_ID=<your-project-id> in backend/.env");
-            if (!jsonFileExists)     nextSteps.put("step_3", "Place firebase-service-account.json at: " + jsonPath);
-            if (!firebaseAppReady)   nextSteps.put("step_4", "FirebaseApp not initialized — fix above items first");
-            if (!messagingBeanPresent) nextSteps.put("step_5", "FirebaseMessaging bean not available — fix above items first");
+            if (!firebaseEnabled) {
+                nextSteps.put("step_1", "Set FIREBASE_ENABLED=true in your environment variables / .env");
+            }
+            if (!credentialsFound) {
+                nextSteps.put("step_2", "Set FIREBASE_SERVICE_ACCOUNT_JSON in environment variables OR place firebase-service-account.json at: " + jsonPath);
+            }
+            if (!firebaseAppReady) {
+                nextSteps.put("step_3", "FirebaseApp not initialized — fix credentials configuration first");
+            }
+            if (!messagingBeanPresent) {
+                nextSteps.put("step_4", "FirebaseMessaging bean not available — ensure FIREBASE_ENABLED=true and valid credentials");
+            }
             status.put("next_steps", nextSteps);
         }
 
