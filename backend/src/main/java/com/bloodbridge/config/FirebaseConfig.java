@@ -23,117 +23,55 @@ import java.nio.file.Paths;
 /**
  * Firebase Admin SDK Configuration — Phase 3B.
  *
- * <p>Initializes FirebaseApp and exposes a FirebaseMessaging bean.
- * Supports loading credentials securely from:
+ * <p>Initializes FirebaseApp and exposes the {@link FirebaseMessaging} bean.
+ * Supports loading credentials securely with the following priority:
  * <ol>
- *   <li>{@code FIREBASE_SERVICE_ACCOUNT_JSON} environment variable (Production / Container deployments).</li>
- *   <li>{@code FIREBASE_SERVICE_ACCOUNT_PATH} file path (Local development / mounted secrets).</li>
+ *   <li>{@code FIREBASE_SERVICE_ACCOUNT_JSON} environment variable / system property (Production / Render Docker).</li>
+ *   <li>{@code FIREBASE_SERVICE_ACCOUNT_PATH} file path (Mounted secrets / local development).</li>
+ *   <li>Classpath fallback at {@code firebase/firebase-service-account.json} (Local development).</li>
  * </ol>
- * No secrets are ever logged or hardcoded in this class.</p>
- *
- * <p>Activation: requires {@code firebase.enabled=true} in application.properties
- * (or {@code FIREBASE_ENABLED=true} in the environment).
- * This prevents startup failure when credentials are not yet configured.</p>
+ * Sensitive credentials and private keys are NEVER logged.</p>
  */
 @Configuration
 @ConditionalOnProperty(name = "firebase.enabled", havingValue = "true", matchIfMissing = false)
 @Slf4j
 public class FirebaseConfig {
 
-    /**
-     * Raw Firebase Service Account JSON string from environment variable.
-     * Preferred for cloud/container deployments (e.g. Render, Railway, Kubernetes)
-     * without needing to commit credentials to Git.
-     */
     @Value("${firebase.service-account-json:${FIREBASE_SERVICE_ACCOUNT_JSON:}}")
     private String serviceAccountJson;
 
-    /**
-     * Path to the Firebase Service Account JSON file.
-     * Resolved from {@code FIREBASE_SERVICE_ACCOUNT_PATH} env variable,
-     * with a safe classpath/filesystem fallback for local development.
-     */
     @Value("${firebase.service-account-path:${FIREBASE_SERVICE_ACCOUNT_PATH:src/main/resources/firebase/firebase-service-account.json}}")
     private String serviceAccountPath;
 
-    /**
-     * Firebase / GCP Project ID.
-     * Resolved from {@code FIREBASE_PROJECT_ID} env variable (optional if embedded in service account JSON).
-     */
     @Value("${firebase.project-id:${FIREBASE_PROJECT_ID:}}")
     private String projectId;
 
-    /**
-     * Initializes and returns the {@link FirebaseMessaging} singleton bean.
-     *
-     * @return {@link FirebaseMessaging} bean ready for injection into services.
-     * @throws IOException           if credentials cannot be parsed or read.
-     * @throws IllegalStateException if neither valid JSON string nor valid file path is provided.
-     */
     @Bean
     public FirebaseMessaging firebaseMessaging() throws IOException {
         log.info("[Firebase] ═══════════════════════════════════════════════");
         log.info("[Firebase] Initializing Firebase Admin SDK — Phase 3B");
 
-        GoogleCredentials credentials;
+        GoogleCredentials credentials = resolveCredentials();
 
-        // ── 1. Production: Check FIREBASE_SERVICE_ACCOUNT_JSON environment variable ──
-        if (serviceAccountJson != null && !serviceAccountJson.trim().isEmpty()) {
-            log.info("[Firebase] Attempting to load credentials from FIREBASE_SERVICE_ACCOUNT_JSON environment variable...");
-            try (InputStream stream = new ByteArrayInputStream(serviceAccountJson.trim().getBytes(StandardCharsets.UTF_8))) {
-                credentials = GoogleCredentials.fromStream(stream);
-                log.info("[Firebase] ✔ Firebase credentials loaded from environment variable.");
-            } catch (IOException ex) {
-                log.error("[Firebase] Failed to parse Firebase service account JSON from environment variable: {}", ex.getMessage());
-                throw new IllegalStateException("[Firebase] Invalid FIREBASE_SERVICE_ACCOUNT_JSON provided in environment variables.", ex);
-            }
-        }
-        // ── 2. Local development: Fallback to file path ──
-        else if (serviceAccountPath != null && !serviceAccountPath.trim().isEmpty()) {
-            Path jsonPath = Paths.get(serviceAccountPath.trim()).toAbsolutePath();
-            log.info("[Firebase] Checking local service account file at: {}", jsonPath);
-
-            if (!Files.exists(jsonPath)) {
-                log.error("[Firebase] Service Account JSON not found at: {}", jsonPath);
-                log.error("[Firebase] Provide FIREBASE_SERVICE_ACCOUNT_JSON in environment variables or place firebase-service-account.json at {}", jsonPath);
-                throw new IllegalStateException(
-                    "[Firebase] Service Account credentials not found. Either provide FIREBASE_SERVICE_ACCOUNT_JSON " +
-                    "as an environment variable or place the JSON file at: " + jsonPath);
-            }
-
-            try (InputStream stream = new FileInputStream(jsonPath.toFile())) {
-                credentials = GoogleCredentials.fromStream(stream);
-                log.info("[Firebase] ✔ Firebase credentials loaded from local file.");
-            } catch (IOException ex) {
-                log.error("[Firebase] Failed to read Service Account JSON file: {}", ex.getMessage());
-                throw ex;
-            }
-        } else {
-            log.error("[Firebase] Neither FIREBASE_SERVICE_ACCOUNT_JSON nor FIREBASE_SERVICE_ACCOUNT_PATH configured.");
-            throw new IllegalStateException(
-                "[Firebase] Missing Firebase configuration: Provide FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH.");
-        }
-
-        // ── 3. Resolve Project ID (if not explicitly set, extract from ServiceAccountCredentials) ──
+        // ── Resolve Project ID (if not explicitly set, extract from ServiceAccountCredentials) ──
         String resolvedProjectId = (projectId != null && !projectId.isBlank()) ? projectId.trim() : null;
         if (resolvedProjectId == null && credentials instanceof ServiceAccountCredentials sac) {
             resolvedProjectId = sac.getProjectId();
         }
 
-        // ── 4. Build FirebaseOptions ──
         FirebaseOptions.Builder optionsBuilder = FirebaseOptions.builder()
                 .setCredentials(credentials);
 
         if (resolvedProjectId != null && !resolvedProjectId.isBlank()) {
             optionsBuilder.setProjectId(resolvedProjectId);
-            log.info("[Firebase] Project ID           : {}", resolvedProjectId);
+            log.info("[Firebase] Project ID: {}", resolvedProjectId);
         } else {
-            log.info("[Firebase] Project ID           : <AUTO-RESOLVED>");
+            log.info("[Firebase] Project ID: <AUTO-RESOLVED>");
         }
 
         FirebaseOptions options = optionsBuilder.build();
 
-        // ── 5. Initialize FirebaseApp (idempotent guard) ──
+        // ── Idempotent initialization guard ──
         FirebaseApp app;
         if (FirebaseApp.getApps().isEmpty()) {
             app = FirebaseApp.initializeApp(options);
@@ -147,5 +85,94 @@ public class FirebaseConfig {
         log.info("[Firebase] ═══════════════════════════════════════════════");
 
         return FirebaseMessaging.getInstance(app);
+    }
+
+    /**
+     * Resolves GoogleCredentials safely from environment variable, file system, or classpath.
+     */
+    private GoogleCredentials resolveCredentials() throws IOException {
+        // 1. Check FIREBASE_SERVICE_ACCOUNT_JSON (Environment Variable / System Property)
+        String rawJson = getServiceAccountJsonString();
+        if (rawJson != null && !rawJson.trim().isEmpty()) {
+            String trimmedJson = rawJson.trim();
+
+            // Strip outer wrapping quotes if present (e.g. '{"type":...}' or "{\"type\":...}")
+            if ((trimmedJson.startsWith("'") && trimmedJson.endsWith("'")) ||
+                (trimmedJson.startsWith("\"") && trimmedJson.endsWith("\"") && trimmedJson.contains("{"))) {
+                trimmedJson = trimmedJson.substring(1, trimmedJson.length() - 1).trim();
+            }
+
+            try {
+                return parseGoogleCredentialsFromJson(trimmedJson);
+            } catch (Exception ex) {
+                // Attempt fallback if escaped newlines were double-escaped in environment variable
+                if (trimmedJson.contains("\\\\n")) {
+                    try {
+                        String unescapedJson = trimmedJson.replace("\\\\n", "\\n");
+                        return parseGoogleCredentialsFromJson(unescapedJson);
+                    } catch (Exception ignored) {
+                        // proceed to throw original error
+                    }
+                }
+                log.error("[Firebase] Failed to parse Firebase service account JSON from environment variable: {}", ex.getMessage());
+                throw new IllegalStateException("[Firebase] Invalid FIREBASE_SERVICE_ACCOUNT_JSON provided in environment variables.", ex);
+            }
+        }
+
+        // 2. Check File Path (Local development / mounted secret file)
+        if (serviceAccountPath != null && !serviceAccountPath.trim().isEmpty()) {
+            Path jsonPath = Paths.get(serviceAccountPath.trim()).toAbsolutePath();
+            if (Files.exists(jsonPath)) {
+                try (InputStream stream = new FileInputStream(jsonPath.toFile())) {
+                    GoogleCredentials credentials = GoogleCredentials.fromStream(stream);
+                    log.info("[Firebase] Firebase service account credentials: CONFIGURED (source: local file)");
+                    return credentials;
+                } catch (IOException ex) {
+                    log.error("[Firebase] Failed to read Service Account JSON file at {}: {}", jsonPath, ex.getMessage());
+                    throw ex;
+                }
+            }
+        }
+
+        // 3. Check Classpath (Local IDE / JAR resource fallback)
+        try (InputStream cpStream = getClass().getClassLoader().getResourceAsStream("firebase/firebase-service-account.json")) {
+            if (cpStream != null) {
+                GoogleCredentials credentials = GoogleCredentials.fromStream(cpStream);
+                log.info("[Firebase] Firebase service account credentials: CONFIGURED (source: classpath)");
+                return credentials;
+            }
+        } catch (Exception ignored) {
+            // fallback failed
+        }
+
+        // 4. If neither exists, produce a clear, actionable error
+        log.error("[Firebase] Firebase service account credentials: NOT CONFIGURED");
+        throw new IllegalStateException(
+            "[Firebase] Service Account credentials not found. " +
+            "Please provide FIREBASE_SERVICE_ACCOUNT_JSON as an environment variable (for Render/production) " +
+            "or place firebase-service-account.json at " + serviceAccountPath + " (for local development).");
+    }
+
+    private GoogleCredentials parseGoogleCredentialsFromJson(String json) throws IOException {
+        try (InputStream stream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))) {
+            GoogleCredentials credentials = GoogleCredentials.fromStream(stream);
+            log.info("[Firebase] Firebase service account credentials: CONFIGURED");
+            return credentials;
+        }
+    }
+
+    private String getServiceAccountJsonString() {
+        if (serviceAccountJson != null && !serviceAccountJson.trim().isEmpty()) {
+            return serviceAccountJson;
+        }
+        String env = System.getenv("FIREBASE_SERVICE_ACCOUNT_JSON");
+        if (env != null && !env.trim().isEmpty()) {
+            return env;
+        }
+        String prop = System.getProperty("FIREBASE_SERVICE_ACCOUNT_JSON");
+        if (prop != null && !prop.trim().isEmpty()) {
+            return prop;
+        }
+        return null;
     }
 }
