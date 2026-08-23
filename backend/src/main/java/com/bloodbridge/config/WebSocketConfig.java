@@ -43,14 +43,21 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setUserDestinationPrefix("/user");
     }
 
-    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8083}")
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:https://blood-bridge-sepia.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8083}")
     private String allowedOrigins;
 
-    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:5173}")
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:https://blood-bridge-sepia.vercel.app}")
     private String frontendUrl;
 
     private String[] resolveAllowedOriginPatterns() {
         java.util.Set<String> patterns = new java.util.LinkedHashSet<>();
+        patterns.add("https://blood-bridge-sepia.vercel.app");
+        patterns.add("https://*.vercel.app");
+        patterns.add("http://localhost:5173");
+        patterns.add("http://localhost:3000");
+        patterns.add("http://127.0.0.1:5173");
+        patterns.add("http://localhost:8083");
+
         if (allowedOrigins != null && !allowedOrigins.isBlank()) {
             for (String origin : allowedOrigins.split(",")) {
                 String trimmed = origin.trim();
@@ -61,9 +68,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         }
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             patterns.add(frontendUrl.trim());
-        }
-        if (patterns.isEmpty()) {
-            patterns.add("*");
         }
         return patterns.toArray(new String[0]);
     }

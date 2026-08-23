@@ -5,7 +5,9 @@ import com.bloodbridge.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -16,8 +18,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Main security configuration class for the application.
@@ -32,6 +36,12 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final AuthenticationProvider authenticationProvider;
+
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:https://blood-bridge-sepia.vercel.app,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8083}")
+    private String allowedOrigins;
+
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:https://blood-bridge-sepia.vercel.app}")
+    private String frontendUrl;
 
     /**
      * Configures the security filter chain.
@@ -49,6 +59,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // Permit all CORS preflight OPTIONS requests before authentication check
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/**",
                                 "/api/auth/**",
@@ -77,12 +89,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:8083}")
-    private String allowedOrigins;
-
-    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:5173}")
-    private String frontendUrl;
-
     /**
      * Configures CORS using configured origin patterns from properties and environment.
      * Supports credentials for SockJS WebSocket handshake and REST API interactions.
@@ -93,7 +99,19 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        java.util.Set<String> originPatterns = new java.util.LinkedHashSet<>();
+        Set<String> originPatterns = new LinkedHashSet<>();
+        
+        // 1. Explicit production frontend origins
+        originPatterns.add("https://blood-bridge-sepia.vercel.app");
+        originPatterns.add("https://*.vercel.app");
+
+        // 2. Local development origins
+        originPatterns.add("http://localhost:5173");
+        originPatterns.add("http://localhost:3000");
+        originPatterns.add("http://127.0.0.1:5173");
+        originPatterns.add("http://localhost:8083");
+
+        // 3. Dynamic origin patterns from environment properties
         if (allowedOrigins != null && !allowedOrigins.isBlank()) {
             for (String origin : allowedOrigins.split(",")) {
                 String trimmed = origin.trim();
@@ -105,15 +123,22 @@ public class SecurityConfig {
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             originPatterns.add(frontendUrl.trim());
         }
-        if (originPatterns.isEmpty()) {
-            originPatterns.add("*");
-        }
 
-        configuration.setAllowedOriginPatterns(new java.util.ArrayList<>(originPatterns));
+        configuration.setAllowedOriginPatterns(new ArrayList<>(originPatterns));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "X-API-KEY",
+                "Accept",
+                "Origin",
+                "X-Requested-With",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
         configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
