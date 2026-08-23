@@ -49,6 +49,9 @@ class MatchingServiceImplTest {
     @Mock
     private AuditLoggerService auditLoggerService;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private MatchingServiceImpl matchingService;
 

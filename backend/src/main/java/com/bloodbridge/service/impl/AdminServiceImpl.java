@@ -85,6 +85,8 @@ public class AdminServiceImpl implements AdminService {
     private final BloodInventoryRepository bloodInventoryRepository;
     private final AuditLogRepository auditLogRepository;
     private final com.bloodbridge.repository.NotificationRepository notificationRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.bloodbridge.repository.MatchedEmergencyDonorRepository matchedEmergencyDonorRepository;
     private final HospitalMapper hospitalMapper;
     private final UserMapper userMapper;
     private final BloodRequestMapper bloodRequestMapper;
@@ -753,17 +755,15 @@ public class AdminServiceImpl implements AdminService {
         Long hid = hospital.getId();
         User user = hospital.getUser();
 
-        // 1. Unlink donations associated with this hospital to preserve medical records
+        // 1. Unlink notifications & donations associated with this hospital
         try {
-            List<Donation> donations = donationRepository.findAll().stream()
-                    .filter(d -> d.getHospital() != null && d.getHospital().getId().equals(hid))
-                    .collect(Collectors.toList());
-            for (Donation d : donations) {
-                d.setHospital(null);
-                donationRepository.save(d);
+            notificationRepository.unlinkHospitalProfile(hid);
+            donationRepository.unlinkHospitalProfile(hid);
+            if (matchedEmergencyDonorRepository != null) {
+                matchedEmergencyDonorRepository.deleteAllByHospitalId(hid);
             }
         } catch (Exception ex) {
-            log.warn("Unlinking hospital donations encountered warning: {}", ex.getMessage());
+            log.warn("Unlinking hospital records encountered warning: {}", ex.getMessage());
         }
 
         // 2. Delete inventory records for this hospital

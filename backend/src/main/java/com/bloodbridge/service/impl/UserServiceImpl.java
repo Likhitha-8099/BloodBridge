@@ -256,15 +256,15 @@ public class UserServiceImpl implements UserService {
             try { matchResultRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete match results failed: {}", ex.getMessage()); }
             try { emailNotificationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete email notifications failed: {}", ex.getMessage()); }
             try { donationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlink donations failed: {}", ex.getMessage()); }
-            try { donationRepository.unlinkDonorMatchResults(dpId); } catch (Exception ex) { log.warn("unlink donation match results failed: {}", ex.getMessage()); }
             try { donorProfileRepository.delete(dp); } catch (Exception ex) { log.warn("delete donor profile failed: {}", ex.getMessage()); }
         });
 
-        try {
-            hospitalRepository.findByUserId(id).ifPresent(hospitalRepository::delete);
-        } catch (Exception ex) {
-            log.warn("Could not delete hospital profile for user {}: {}", id, ex.getMessage());
-        }
+        hospitalRepository.findByUserId(id).ifPresent(h -> {
+            try { notificationRepository.unlinkHospitalProfile(h.getId()); } catch (Exception ignored) {}
+            try { donationRepository.unlinkHospitalProfile(h.getId()); } catch (Exception ignored) {}
+            try { matchedEmergencyDonorRepository.deleteAllByHospitalId(h.getId()); } catch (Exception ignored) {}
+            try { hospitalRepository.delete(h); } catch (Exception ex) { log.warn("Could not delete hospital profile for user {}: {}", id, ex.getMessage()); }
+        });
 
         try {
             patientProfileRepository.findByUserId(id).ifPresent(patientProfileRepository::delete);
@@ -325,7 +325,6 @@ public class UserServiceImpl implements UserService {
             try { emailNotificationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete email notifications error: {}", ex.getMessage()); }
 
             try { donationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlink donations error: {}", ex.getMessage()); }
-            try { donationRepository.unlinkDonorMatchResults(dpId); } catch (Exception ex) { log.warn("unlink donation match results error: {}", ex.getMessage()); }
             try { matchResultRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete match results error: {}", ex.getMessage()); }
 
             try {

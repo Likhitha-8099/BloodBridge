@@ -59,6 +59,9 @@ public class DataSeeder implements CommandLineRunner {
                 try {
                     jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN donor_profile_id BIGINT NULL");
                 } catch (Exception ignored) {}
+                try {
+                    jdbcTemplate.execute("ALTER TABLE donations MODIFY COLUMN hospital_id BIGINT NULL");
+                } catch (Exception ignored) {}
                 log.info("Startup Validation: Successfully aligned notifications, match_results, audit_logs, and donations table schema.");
             }
         } catch (Exception e) {

@@ -43,8 +43,7 @@ public class Donation {
     private BloodRequest bloodRequest;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hospital_id", nullable = false)
-    @NotNull(message = "Hospital reference is required")
+    @JoinColumn(name = "hospital_id", nullable = true)
     private Hospital hospital;
 
     @ManyToOne(fetch = FetchType.LAZY)

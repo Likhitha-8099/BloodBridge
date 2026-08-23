@@ -17,6 +17,8 @@ import com.bloodbridge.service.AuditLoggerService;
 import com.bloodbridge.service.MatchingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.bloodbridge.event.DonorMatchedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ public class MatchingServiceImpl implements MatchingService {
     private final MatchingEngine matchingEngine;
     private final MatchingMapper matchingMapper;
     private final AuditLoggerService auditLoggerService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -63,6 +66,18 @@ public class MatchingServiceImpl implements MatchingService {
 
         auditLoggerService.logEvent("MATCHING_COMPLETED", "SYSTEM", "Generated " + savedMatches.size() + " matches for request ID: " + bloodRequestId);
         log.info("Matching completed successfully for request ID: {}. Top match score: {}", bloodRequestId, savedMatches.isEmpty() ? 0 : savedMatches.get(0).getMatchScore());
+
+        // Publish event for matched donors (triggers in-app and email notifications)
+        if (eventPublisher != null) {
+            for (MatchResult match : savedMatches) {
+                try {
+                    eventPublisher.publishEvent(new DonorMatchedEvent(this, match));
+                } catch (Exception ex) {
+                    log.error("[DONOR-MATCH-EVENT-ERROR] Failed to publish match event for donor #{}: {}",
+                            match.getDonor() != null ? match.getDonor().getId() : "N/A", ex.getMessage());
+                }
+            }
+        }
 
         List<MatchResponse> response = savedMatches.stream()
                 .map(matchingMapper::toResponse)

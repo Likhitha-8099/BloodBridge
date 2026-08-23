@@ -3,8 +3,6 @@ package com.bloodbridge.service;
 import com.bloodbridge.dto.request.RegisterRequest;
 import com.bloodbridge.dto.response.ApiResponse;
 import com.bloodbridge.entity.DonorProfile;
-import com.bloodbridge.entity.Hospital;
-import com.bloodbridge.entity.PatientProfile;
 import com.bloodbridge.entity.User;
 import com.bloodbridge.enums.BloodGroup;
 import com.bloodbridge.enums.Role;

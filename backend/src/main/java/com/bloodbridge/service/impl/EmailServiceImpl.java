@@ -157,6 +157,9 @@ public class EmailServiceImpl implements EmailService {
                     recipientEmail, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A", e.getMessage(), e);
 
             recordEmailNotification(reqId, donorId, recipientEmail, false, durationMs, e.getMessage());
+            if (reqId != null && donorId != null) {
+                processedEmailKeys.remove(reqId + "_" + donorId + "_EMERGENCY_ALERT");
+            }
         }
     }
 
@@ -415,6 +418,7 @@ public class EmailServiceImpl implements EmailService {
             log.info("[EMAIL-ACCEPTANCE-SUCCESS] Request ID: #{}, Recipient: {}", requestId, toHospitalEmail);
         } catch (Exception e) {
             log.error("[EMAIL-FAILURE] Email type: ACCEPTANCE, Recipient: {}, Reason: {}", toHospitalEmail, e.getMessage());
+            processedEmailKeys.remove(idempotencyKey);
         }
     }
 }

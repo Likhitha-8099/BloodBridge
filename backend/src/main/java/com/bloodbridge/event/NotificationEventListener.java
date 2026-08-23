@@ -89,6 +89,20 @@ public class NotificationEventListener {
                 match.getBloodRequest().getBloodGroupNeeded()
         );
         notificationService.triggerNotificationEvent(donorUser, title, message, NotificationType.DONOR_MATCHED);
+
+        if (donorUser != null && donorUser.getEmail() != null && !donorUser.getEmail().isBlank() && emailService != null) {
+            try {
+                String hospName = (match.getBloodRequest() != null && match.getBloodRequest().getHospital() != null)
+                        ? match.getBloodRequest().getHospital().getHospitalName()
+                        : "Partner Hospital";
+                String bgNeeded = (match.getBloodRequest() != null && match.getBloodRequest().getBloodGroupNeeded() != null)
+                        ? match.getBloodRequest().getBloodGroupNeeded().name()
+                        : "ANY";
+                emailService.sendMatchNotificationEmail(donorUser.getEmail(), bgNeeded, hospName);
+            } catch (Exception e) {
+                log.error("[DONOR-MATCHED-EMAIL-ERROR] Failed to send match email to donor {}: {}", donorUser.getEmail(), e.getMessage());
+            }
+        }
     }
 
     /**
@@ -98,14 +112,49 @@ public class NotificationEventListener {
      */
     @EventListener
     public void handleDonationAccepted(DonationAcceptedEvent event) {
+        if (event == null || event.getDonation() == null) return;
         Donation donation = event.getDonation();
+        if (donation.getHospital() == null) return;
         User hospitalUser = donation.getHospital().getUser();
+        String donorName = (donation.getDonor() != null && donation.getDonor().getUser() != null)
+                ? donation.getDonor().getUser().getFullName()
+                : "Valued Donor";
         String title = "Donor Accepted Match Request";
         String message = String.format(
                 "Donor %s has accepted the match for donation record #%d.",
-                donation.getDonor().getUser().getFullName(), donation.getId()
+                donorName, donation.getId()
         );
-        notificationService.triggerNotificationEvent(hospitalUser, title, message, NotificationType.DONATION_ACCEPTED);
+        if (hospitalUser != null) {
+            notificationService.triggerNotificationEvent(hospitalUser, title, message, NotificationType.DONATION_ACCEPTED);
+        }
+
+        String hospitalEmail = (hospitalUser != null && hospitalUser.getEmail() != null && !hospitalUser.getEmail().isBlank())
+                ? hospitalUser.getEmail()
+                : donation.getHospital().getEmail();
+
+        if (hospitalEmail != null && !hospitalEmail.isBlank() && emailService != null) {
+            try {
+                String bgStr = (donation.getBloodRequest() != null && donation.getBloodRequest().getBloodGroupNeeded() != null)
+                        ? donation.getBloodRequest().getBloodGroupNeeded().name()
+                        : "ANY";
+                Long reqId = donation.getBloodRequest() != null ? donation.getBloodRequest().getId() : donation.getId();
+                Integer units = donation.getUnitsDonated() != null ? donation.getUnitsDonated() : 1;
+                String acceptedAtStr = java.time.LocalDateTime.now().toString();
+
+                emailService.sendDonorAcceptanceEmailToHospital(
+                        hospitalEmail,
+                        donation.getHospital().getHospitalName(),
+                        donorName,
+                        bgStr,
+                        reqId,
+                        units,
+                        0.0,
+                        acceptedAtStr
+                );
+            } catch (Exception e) {
+                log.error("[HOSPITAL-ACCEPTANCE-EMAIL-ERROR] Failed to send acceptance email to hospital {}: {}", hospitalEmail, e.getMessage());
+            }
+        }
     }
 
     /**

@@ -323,7 +323,7 @@ public class DonorProfileServiceImpl implements DonorProfileService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ApiResponse<EligibilityResponse> calculateEligibility(String email) {
         log.info("Computing smart eligibility report for email: {}", email);
         DonorProfile profile = findDonorByEmail(email);
@@ -410,7 +410,7 @@ public class DonorProfileServiceImpl implements DonorProfileService {
         }
 
         // 2. Age & Weight Deferral Checks
-        if (profile.getAge() < 18 || profile.getAge() > 65) {
+        if (profile.getAge() != null && (profile.getAge() < 18 || profile.getAge() > 65)) {
             return EligibilityResponse.builder()
                     .status(EligibilityStatus.TEMPORARILY_DEFERRED)
                     .eligible(false)
@@ -421,7 +421,7 @@ public class DonorProfileServiceImpl implements DonorProfileService {
                     .build();
         }
 
-        if (profile.getWeight() < 50.0) {
+        if (profile.getWeight() != null && profile.getWeight() < 50.0) {
             return EligibilityResponse.builder()
                     .status(EligibilityStatus.TEMPORARILY_DEFERRED)
                     .eligible(false)

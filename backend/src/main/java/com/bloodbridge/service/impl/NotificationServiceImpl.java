@@ -64,6 +64,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
@@ -476,6 +477,42 @@ public class NotificationServiceImpl implements NotificationService {
 
         Notification saved = notificationRepository.save(notification);
         publishRealtimeNotification(saved);
+
+        // Dispatch Async Email to Hospital Administrator (Safe / Non-blocking)
+        if (emailService != null) {
+            String hospitalEmail = (hospitalUser.getEmail() != null && !hospitalUser.getEmail().isBlank())
+                    ? hospitalUser.getEmail()
+                    : hospital.getEmail();
+
+            if (hospitalEmail != null && !hospitalEmail.isBlank()) {
+                try {
+                    String donorName = (donor.getUser() != null && donor.getUser().getFullName() != null)
+                            ? donor.getUser().getFullName()
+                            : "Valued Donor";
+                    String bgFormatted = (request != null && request.getBloodGroupNeeded() != null)
+                            ? request.getBloodGroupNeeded().name().replace("_POSITIVE", "+").replace("_NEGATIVE", "-")
+                            : "Emergency";
+                    Long reqId = request != null ? request.getId() : 0L;
+                    Integer units = request != null ? request.getUnitsRequired() : 1;
+                    String acceptedAtStr = LocalDateTime.now().toString();
+
+                    emailService.sendDonorAcceptanceEmailToHospital(
+                            hospitalEmail,
+                            hospital.getHospitalName(),
+                            donorName,
+                            bgFormatted,
+                            reqId,
+                            units,
+                            0.0,
+                            acceptedAtStr
+                    );
+                    log.info("[HOSPITAL-ACCEPTANCE-EMAIL] Dispatched donor acceptance email to hospital: {} for Request #{}", hospitalEmail, reqId);
+                } catch (Exception ex) {
+                    log.error("[HOSPITAL-ACCEPTANCE-EMAIL-ERROR] Failed to dispatch donor acceptance email to hospital {}: {}. Dashboard notification preserved.",
+                            hospitalEmail, ex.getMessage());
+                }
+            }
+        }
     }
 
     @Override
@@ -559,6 +596,55 @@ public class NotificationServiceImpl implements NotificationService {
 
         Notification saved = notificationRepository.save(notification);
         publishRealtimeNotification(saved);
+
+        // Dispatch Email Notification to matched donor asynchronously
+        if (emailService != null) {
+            String recipientEmail = (donor.getUser() != null && donor.getUser().getEmail() != null && !donor.getUser().getEmail().isBlank())
+                    ? donor.getUser().getEmail()
+                    : donor.getEmail();
+
+            if (recipientEmail != null && !recipientEmail.isBlank()) {
+                try {
+                    if (bloodRequest != null) {
+                        Hospital hosp = hospital != null ? hospital : bloodRequest.getHospital();
+                        String hospName = hosp != null && hosp.getHospitalName() != null ? hosp.getHospitalName() : "Partner Hospital";
+                        String hospAddress = hosp != null && hosp.getAddress() != null ? hosp.getAddress() : "";
+                        String donorFullName = donor.getUser() != null && donor.getUser().getFullName() != null ? donor.getUser().getFullName() : "Valued Donor";
+                        String bgStr = bloodRequest.getBloodGroupNeeded() != null ? bloodRequest.getBloodGroupNeeded().name() : (donor.getBloodGroup() != null ? donor.getBloodGroup().name() : "ANY");
+                        String urgency = bloodRequest.getUrgencyLevel() != null ? bloodRequest.getUrgencyLevel().name() : "HIGH";
+                        String reqDateStr = bloodRequest.getRequiredByDate() != null ? bloodRequest.getRequiredByDate().toString() : "Immediate";
+                        String reasonStr = bloodRequest.getReason() != null ? bloodRequest.getReason() : "Emergency Requirement";
+
+                        EmergencyMailDto mailDto = EmergencyMailDto.builder()
+                                .requestId(bloodRequest.getId())
+                                .donorId(donor.getId())
+                                .toEmail(recipientEmail)
+                                .donorName(donorFullName)
+                                .hospitalName(hospName)
+                                .bloodGroup(bgStr)
+                                .unitsRequired(bloodRequest.getUnitsRequired() != null ? bloodRequest.getUnitsRequired() : 1)
+                                .urgencyLevel(urgency)
+                                .hospitalAddress(hospAddress)
+                                .city(donor.getCity() != null ? donor.getCity() : (hosp != null ? hosp.getCity() : ""))
+                                .state(donor.getState() != null ? donor.getState() : (hosp != null ? hosp.getState() : ""))
+                                .requiredByDate(reqDateStr)
+                                .reason(reasonStr)
+                                .loginUrl(frontendUrl + "/donor/requests")
+                                .build();
+
+                        emailService.sendEmergencyAlert(mailDto);
+                        log.info("[DONOR-MATCH-EMAIL] Dispatched emergency alert email to matched donor: {} for Request #{}", recipientEmail, bloodRequest.getId());
+                    } else if (type == NotificationType.DONOR_MATCHED) {
+                        String hospName = hospital != null && hospital.getHospitalName() != null ? hospital.getHospitalName() : "Partner Hospital";
+                        String bgStr = donor.getBloodGroup() != null ? donor.getBloodGroup().name() : "ANY";
+                        emailService.sendMatchNotificationEmail(recipientEmail, bgStr, hospName);
+                        log.info("[DONOR-MATCH-EMAIL] Dispatched match notification email to donor: {}", recipientEmail);
+                    }
+                } catch (Exception ex) {
+                    log.error("[DONOR-MATCH-EMAIL-ERROR] Failed to dispatch email to matched donor {}: {}. Dashboard notification preserved.", recipientEmail, ex.getMessage());
+                }
+            }
+        }
     }
 
     @Override

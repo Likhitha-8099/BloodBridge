@@ -6,8 +6,6 @@ import com.bloodbridge.service.AuditLoggerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -22,7 +20,6 @@ public class AuditLoggerServiceImpl implements AuditLoggerService {
     private final AuditLogRepository auditLogRepository;
 
     @Override
-    @Transactional
     public void logEvent(String action, String email, String details) {
         log.info("[AUDIT EVENT] Timestamp: {} | Action: {} | User: {} | Context: {}",
                 LocalDateTime.now(), action, email, details);
@@ -37,9 +34,9 @@ public class AuditLoggerServiceImpl implements AuditLoggerService {
                     .severity("INFO")
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.saveAndFlush(auditLog);
+            auditLogRepository.save(auditLog);
         } catch (Exception e) {
-            log.error("[AUDIT LOG SAVE ERROR] Failed to persist audit log: {}", e.getMessage(), e);
+            log.warn("[AUDIT LOG SAVE WARNING] Could not persist audit log record: {}", e.getMessage());
         }
     }
 

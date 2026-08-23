@@ -43,4 +43,8 @@ public interface MatchedEmergencyDonorRepository extends JpaRepository<MatchedEm
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM MatchedEmergencyDonor med WHERE med.donor.id = :donorId")
     void deleteAllByDonorId(@Param("donorId") Long donorId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM MatchedEmergencyDonor med WHERE med.hospital.id = :hospitalId")
+    void deleteAllByHospitalId(@Param("hospitalId") Long hospitalId);
 }

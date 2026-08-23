@@ -97,4 +97,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Notification n SET n.donor = null WHERE n.donor.id = :donorId")
     void unlinkDonorProfile(@Param("donorId") Long donorId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Notification n SET n.hospital = null WHERE n.hospital.id = :hospitalId")
+    void unlinkHospitalProfile(@Param("hospitalId") Long hospitalId);
 }
