@@ -3,14 +3,22 @@ FROM maven:3.9.9-eclipse-temurin-21-jammy AS builder
 
 WORKDIR /app
 
-# Copy application source code
+# Copy application source code and Maven configuration
 COPY . .
 
-# Build Spring Boot JAR directly using pre-installed Maven
+# Build Spring Boot JAR using global CDN mirror and wagon retry handlers to prevent HTTP 429 rate limiting
 RUN if [ -f "./backend/pom.xml" ]; then \
-        cd backend && mvn clean package -DskipTests -B; \
+        cd backend && mvn clean package -DskipTests -B \
+            --settings .mvn/settings.xml \
+            -Dmaven.wagon.http.retryHandler.count=5 \
+            -Dmaven.wagon.http.retryHandler.requestSentRetryEnabled=true \
+            -Dmaven.wagon.httpconnectionManager.ttlSeconds=120; \
     else \
-        mvn clean package -DskipTests -B; \
+        mvn clean package -DskipTests -B \
+            --settings .mvn/settings.xml \
+            -Dmaven.wagon.http.retryHandler.count=5 \
+            -Dmaven.wagon.http.retryHandler.requestSentRetryEnabled=true \
+            -Dmaven.wagon.httpconnectionManager.ttlSeconds=120; \
     fi
 
 # Locate and stage the generated executable JAR
