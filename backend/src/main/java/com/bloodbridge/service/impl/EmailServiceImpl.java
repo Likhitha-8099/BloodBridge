@@ -26,16 +26,16 @@ public class EmailServiceImpl implements EmailService {
     private final JavaMailSender mailSender;
     private final com.bloodbridge.repository.EmailNotificationRepository emailNotificationRepository;
 
-    @Value("${spring.mail.host:smtp.gmail.com}")
+    @Value("${SPRING_MAIL_HOST:${MAIL_HOST:${spring.mail.host:smtp.gmail.com}}}")
     private String mailHost;
 
-    @Value("${spring.mail.port:587}")
+    @Value("${SPRING_MAIL_PORT:${MAIL_PORT:${spring.mail.port:587}}}")
     private int mailPort;
 
-    @Value("${spring.mail.username:your_email@gmail.com}")
+    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:your_email@gmail.com}}}")
     private String fromEmail;
 
-    @Value("${spring.mail.password:}")
+    @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:${spring.mail.password:}}}")
     private String mailPassword;
 
     @Value("${app.frontend.url:http://localhost:5173}")
@@ -43,18 +43,36 @@ public class EmailServiceImpl implements EmailService {
 
     private volatile String cachedEmergencyHtmlTemplate = null;
 
+    /**
+     * Safely masks an email address for production logging (e.g. l***@gmail.com).
+     */
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "[MISSING_EMAIL]";
+        }
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***" + email.substring(Math.max(0, atIndex));
+        }
+        return email.charAt(0) + "***" + email.substring(atIndex);
+    }
+
+    private boolean isSmtpPasswordConfigured() {
+        return mailPassword != null && !mailPassword.isBlank() && !"your-gmail-app-password-here".equals(mailPassword.trim());
+    }
+
     @jakarta.annotation.PostConstruct
     public void init() {
-        boolean pwdSet = mailPassword != null && !mailPassword.isBlank() && !"your-gmail-app-password-here".equals(mailPassword);
+        boolean pwdSet = isSmtpPasswordConfigured();
         log.info("================================================================================");
-        log.info("EmailServiceImpl Initialized with Spring Mail configuration:");
-        log.info(" - Host           : {}", mailHost);
-        log.info(" - Port           : {}", mailPort);
-        log.info(" - Username/From  : {}", fromEmail);
-        log.info(" - Password Status: {}", pwdSet ? "CONFIGURED (Length: " + mailPassword.length() + ")" : "NOT CONFIGURED / DEFAULT PLACEHOLDER");
-        log.info(" - JavaMailSender : {}", mailSender != null ? mailSender.getClass().getName() : "NULL");
+        log.info("[EMAIL] EmailServiceImpl Initialized with Spring Mail configuration:");
+        log.info("[EMAIL]  - SMTP Host           : {}", mailHost);
+        log.info("[EMAIL]  - SMTP Port           : {}", mailPort);
+        log.info("[EMAIL]  - Sender / From Email : {}", fromEmail);
+        log.info("[EMAIL]  - SMTP Configured     : {}", pwdSet);
+        log.info("[EMAIL]  - JavaMailSender Bean : {}", mailSender != null ? mailSender.getClass().getName() : "NULL");
         getEmergencyHtmlTemplate();
-        log.info(" - Emergency Template Pre-cached: {}", cachedEmergencyHtmlTemplate != null);
+        log.info("[EMAIL]  - Emergency Template  : {}", cachedEmergencyHtmlTemplate != null ? "CACHED" : "UNAVAILABLE");
         log.info("================================================================================");
     }
 
@@ -105,13 +123,14 @@ public class EmailServiceImpl implements EmailService {
         }
 
         long startTime = System.currentTimeMillis();
+        String maskedRecipient = maskEmail(recipientEmail);
         try {
-            log.info("[EMAIL-EMERGENCY] Sending emergency request email to {} (Request #{}, Donor #{})",
-                    recipientEmail, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
+            log.info("[EMAIL] Sending emergency notification | Recipient: {} | Request #{}, Donor #{} | SMTP configured: {}",
+                    maskedRecipient, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A", isSmtpPasswordConfigured());
 
             String htmlTemplate = getEmergencyHtmlTemplate();
             if (htmlTemplate == null || htmlTemplate.isBlank()) {
-                log.error("[EMAIL-EMERGENCY-FAILED] Failed to send emergency request email to {}: emergency HTML template not available", recipientEmail);
+                log.error("[EMAIL] Emergency notification delivery failed: emergency HTML template not available | Recipient: {}", maskedRecipient);
                 recordEmailNotification(reqId, donorId, recipientEmail, false, 0, "Emergency HTML template missing");
                 return;
             }
@@ -147,14 +166,14 @@ public class EmailServiceImpl implements EmailService {
             mailSender.send(mimeMessage);
             long durationMs = System.currentTimeMillis() - startTime;
 
-            log.info("[EMAIL-EMERGENCY-SUCCESS] Emergency request email successfully sent to {} (Request #{}, Donor #{})",
-                    recipientEmail, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
+            log.info("[EMAIL] Emergency alert email sent successfully | Recipient: {} | Duration: {} ms",
+                    maskedRecipient, durationMs);
 
             recordEmailNotification(reqId, donorId, recipientEmail, true, durationMs, null);
         } catch (Exception e) {
             long durationMs = System.currentTimeMillis() - startTime;
-            log.error("[EMAIL-EMERGENCY-FAILED] Failed to send emergency request email to {} (Request #{}, Donor #{}): {}",
-                    recipientEmail, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A", e.getMessage(), e);
+            log.error("[EMAIL] Emergency notification delivery failed: {} ({}) | Recipient: {} | Request #{}, Donor #{}",
+                    e.getClass().getSimpleName(), e.getMessage(), maskedRecipient, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
 
             recordEmailNotification(reqId, donorId, recipientEmail, false, durationMs, e.getMessage());
             if (reqId != null && donorId != null) {
@@ -194,7 +213,7 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async("emergencyEmailExecutor")
     public void sendHospitalApproval(String toEmail, String hospitalName) {
-        log.info("Sending hospital approval email to: {}", toEmail);
+        log.info("[EMAIL] Sending hospital approval notification | Recipient: {}", maskEmail(toEmail));
         String subject = "BloodBridge - Hospital Account Approved!";
         String content = String.format(
                 "Dear Administrator,\n\n" +
@@ -209,7 +228,7 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async("emergencyEmailExecutor")
     public void sendDonationConfirmation(String toEmail, String donorName, String hospitalName, String bloodGroup) {
-        log.info("Sending donation confirmation email to donor: {}", toEmail);
+        log.info("[EMAIL] Sending donation confirmation notification | Recipient: {}", maskEmail(toEmail));
         String subject = "BloodBridge - Thank You for Your Lifesaving Donation!";
         String content = String.format(
                 "Dear %s,\n\n" +
@@ -223,7 +242,9 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async("emergencyEmailExecutor")
     public void sendEmail(String to, String subject, String content) {
-        log.info("[EMAIL-PIPELINE] Initiating async simple email send to: {}, subject: {}, thread: {}", to, subject, Thread.currentThread().getName());
+        String maskedRecipient = maskEmail(to);
+        log.info("[EMAIL] Initiating async simple email dispatch | Recipient: {} | Subject: {} | Thread: {}",
+                maskedRecipient, subject, Thread.currentThread().getName());
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
@@ -231,9 +252,10 @@ public class EmailServiceImpl implements EmailService {
             message.setSubject(subject);
             message.setText(content);
             mailSender.send(message);
-            log.info("[EMAIL-PIPELINE-SUCCESS] Simple email dispatched successfully to: {}", to);
+            log.info("[EMAIL] Simple email dispatched successfully | Recipient: {}", maskedRecipient);
         } catch (Exception e) {
-            log.error("[EMAIL-PIPELINE-FAILURE] Failed to deliver simple email to {}. Full stack trace below:", to, e);
+            log.error("[EMAIL] Email delivery failed: {} ({}) | Recipient: {}",
+                    e.getClass().getSimpleName(), e.getMessage(), maskedRecipient);
         }
     }
 
@@ -299,7 +321,7 @@ public class EmailServiceImpl implements EmailService {
             byte[] pdfBytes
     ) {
         if (toEmail == null || toEmail.isBlank()) {
-            log.warn("[EMAIL-CERTIFICATE-SKIP] Recipient email is null or blank for Certificate ID {}", certificateId);
+            log.warn("[EMAIL] Recipient email is null or blank for Certificate ID {}", certificateId);
             return;
         }
 
@@ -307,12 +329,14 @@ public class EmailServiceImpl implements EmailService {
         if (certificateId != null && !certificateId.isBlank()) {
             String idempotencyKey = certificateId + "_CERTIFICATE_EMAIL";
             if (!processedEmailKeys.add(idempotencyKey)) {
-                log.info("[EMAIL-CERTIFICATE-SKIP] Duplicate certificate email suppressed for key: {}", idempotencyKey);
+                log.info("[EMAIL] Duplicate certificate email suppressed for key: {}", idempotencyKey);
                 return;
             }
         }
 
-        log.info("[EMAIL-CERTIFICATE] Sending donation certificate email to {} for Certificate ID {}", toEmail, certificateId);
+        String maskedRecipient = maskEmail(toEmail);
+        log.info("[EMAIL] Sending donation certificate email | Recipient: {} | Certificate ID: {}",
+                maskedRecipient, certificateId);
 
         String subject = "BloodBridge Donation Certificate";
         String formattedBg = bloodGroup != null ? bloodGroup.replace("_POSITIVE", "+").replace("_NEGATIVE", "-") : "N/A";
@@ -350,9 +374,11 @@ public class EmailServiceImpl implements EmailService {
             }
 
             mailSender.send(message);
-            log.info("[EMAIL-CERTIFICATE-SUCCESS] Certificate PDF email successfully delivered to {}", toEmail);
+            log.info("[EMAIL] Certificate PDF email successfully delivered | Recipient: {} | Certificate ID: {}",
+                    maskedRecipient, certificateId);
         } catch (Exception e) {
-            log.error("[EMAIL-CERTIFICATE-FAILURE] Failed to deliver donation certificate email to {}: {}. Completion state remains preserved.", toEmail, e.getMessage());
+            log.error("[EMAIL] Failed to deliver donation certificate email: {} ({}) | Recipient: {} | Certificate ID: {}",
+                    e.getClass().getSimpleName(), e.getMessage(), maskedRecipient, certificateId);
         }
     }
 
@@ -369,17 +395,19 @@ public class EmailServiceImpl implements EmailService {
             String acceptedAtStr
     ) {
         if (toHospitalEmail == null || toHospitalEmail.isBlank()) {
-            log.error("[EMAIL-FAILURE] Email type: ACCEPTANCE, Recipient: NULL/BLANK, Reason: Missing hospital email address");
+            log.error("[EMAIL] Donor acceptance notification failed: Missing hospital email address | Request ID: #{}", requestId);
             return;
         }
 
         String idempotencyKey = requestId + "_" + (donorName != null ? donorName : "DONOR") + "_ACCEPTANCE";
         if (!processedEmailKeys.add(idempotencyKey)) {
-            log.info("[EMAIL-ACCEPTANCE-SKIP] Duplicate acceptance email ignored for Key: {}", idempotencyKey);
+            log.info("[EMAIL] Duplicate acceptance email ignored for Key: {}", idempotencyKey);
             return;
         }
 
-        log.info("[EMAIL-ACCEPTANCE-QUEUE] Request ID: #{}, Donor: {}, Hospital: {}", requestId, donorName, hospitalName);
+        String maskedRecipient = maskEmail(toHospitalEmail);
+        log.info("[EMAIL] Sending donor acceptance notification | Recipient: {} | Request ID: #{}, Donor: {}, Hospital: {}",
+                maskedRecipient, requestId, donorName, hospitalName);
 
         try {
             String formattedBloodGroup = bloodGroup != null ? bloodGroup.replace("_POSITIVE", "+").replace("_NEGATIVE", "-") : "N/A";
@@ -415,9 +443,11 @@ public class EmailServiceImpl implements EmailService {
 
             mailSender.send(mimeMessage);
 
-            log.info("[EMAIL-ACCEPTANCE-SUCCESS] Request ID: #{}, Recipient: {}", requestId, toHospitalEmail);
+            log.info("[EMAIL] Donor acceptance email sent successfully | Recipient: {} | Request ID: #{}",
+                    maskedRecipient, requestId);
         } catch (Exception e) {
-            log.error("[EMAIL-FAILURE] Email type: ACCEPTANCE, Recipient: {}, Reason: {}", toHospitalEmail, e.getMessage());
+            log.error("[EMAIL] Donor acceptance email delivery failed: {} ({}) | Recipient: {} | Request ID: #{}",
+                    e.getClass().getSimpleName(), e.getMessage(), maskedRecipient, requestId);
             processedEmailKeys.remove(idempotencyKey);
         }
     }

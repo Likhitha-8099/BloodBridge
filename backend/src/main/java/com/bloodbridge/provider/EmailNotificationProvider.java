@@ -22,15 +22,26 @@ public class EmailNotificationProvider implements NotificationProvider {
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
+    @org.springframework.beans.factory.annotation.Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:your_email@gmail.com}}}")
+    private String fromEmail;
+
     @Override
     public boolean supports(DeliveryChannel channel) {
         return channel == DeliveryChannel.EMAIL;
     }
 
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) return "[MISSING_EMAIL]";
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) return "***" + email.substring(Math.max(0, atIndex));
+        return email.charAt(0) + "***" + email.substring(atIndex);
+    }
+
     @Override
     public void send(Notification notification) {
         String recipientEmail = notification.getRecipientUser() != null ? notification.getRecipientUser().getEmail() : null;
-        log.info("[EMAIL PROVIDER] Dispatching email notification to: {} | Subject: {}", recipientEmail, notification.getTitle());
+        String maskedRecipient = maskEmail(recipientEmail);
+        log.info("[EMAIL] Dispatching notification | Recipient: {} | Subject: {}", maskedRecipient, notification.getTitle());
 
         if (recipientEmail == null || recipientEmail.isBlank()) {
             notification.setStatus(NotificationStatus.FAILED);
@@ -43,20 +54,23 @@ public class EmailNotificationProvider implements NotificationProvider {
                 MimeMessage mimeMessage = mailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
                 helper.setTo(recipientEmail);
+                String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "your_email@gmail.com";
+                helper.setFrom(senderEmail, "BloodBridge System");
                 helper.setSubject(notification.getTitle());
                 helper.setText(buildHtmlEmailBody(notification), true);
                 mailSender.send(mimeMessage);
-                log.info("[EMAIL PROVIDER] Email successfully sent via JavaMailSender to {}", recipientEmail);
+                log.info("[EMAIL] Notification email successfully sent | Recipient: {}", maskedRecipient);
             } else {
-                log.info("[EMAIL PROVIDER - SIMULATION] MailSender not configured. Email logged: To={}, Title={}, Content={}",
-                        recipientEmail, notification.getTitle(), notification.getMessage());
+                log.info("[EMAIL - SIMULATION] MailSender not configured. Email logged: To={}, Title={}",
+                        maskedRecipient, notification.getTitle());
             }
 
             notification.setStatus(NotificationStatus.SENT);
             notification.setSentAt(LocalDateTime.now());
 
         } catch (Exception e) {
-            log.error("[EMAIL PROVIDER ERROR] Failed to send email to {}: {}", recipientEmail, e.getMessage(), e);
+            log.error("[EMAIL] Failed to send notification email: {} ({}) | Recipient: {}",
+                    e.getClass().getSimpleName(), e.getMessage(), maskedRecipient);
             notification.setStatus(NotificationStatus.FAILED);
             notification.setLastFailureReason(e.getMessage());
             notification.setRetryCount(notification.getRetryCount() + 1);

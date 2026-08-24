@@ -35,16 +35,16 @@ public class EmailDebugController {
     private final JavaMailSender mailSender;
     private final EmailService emailService;
 
-    @Value("${spring.mail.host:smtp.gmail.com}")
+    @Value("${SPRING_MAIL_HOST:${MAIL_HOST:${spring.mail.host:smtp.gmail.com}}}")
     private String mailHost;
 
-    @Value("${spring.mail.port:587}")
+    @Value("${SPRING_MAIL_PORT:${MAIL_PORT:${spring.mail.port:587}}}")
     private int mailPort;
 
-    @Value("${spring.mail.username:your_email@gmail.com}")
+    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:your_email@gmail.com}}}")
     private String mailUsername;
 
-    @Value("${spring.mail.password:}")
+    @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:${spring.mail.password:}}}")
     private String mailPassword;
 
     @Value("${app.frontend.url:http://localhost:5173}")
@@ -52,7 +52,8 @@ public class EmailDebugController {
 
     @PostConstruct
     public void init() {
-        boolean pwdSet = mailPassword != null && !mailPassword.isBlank() && !"your-gmail-app-password-here".equals(mailPassword);
+        String sanitizedPassword = mailPassword != null ? mailPassword.trim().replace(" ", "") : "";
+        boolean pwdSet = !sanitizedPassword.isEmpty() && !"your-gmail-app-password-here".equals(sanitizedPassword);
         log.info("================================================================================");
         log.info("✅ EmailDebugController Loaded Successfully:");
         log.info(" - MAIL_HOST           : {}", mailHost);
@@ -66,15 +67,16 @@ public class EmailDebugController {
     @GetMapping("/smtp-status")
     public ResponseEntity<Map<String, Object>> getSmtpStatus() {
         Map<String, Object> status = new HashMap<>();
-        boolean isPasswordDefault = "your-gmail-app-password-here".equals(mailPassword);
-        boolean isPasswordEmpty = mailPassword == null || mailPassword.isBlank();
+        String sanitizedPassword = mailPassword != null ? mailPassword.trim().replace(" ", "") : "";
+        boolean isPasswordDefault = "your-gmail-app-password-here".equals(sanitizedPassword);
+        boolean isPasswordEmpty = sanitizedPassword.isEmpty();
         boolean isPasswordValid = !isPasswordEmpty && !isPasswordDefault;
 
         status.put("mailHost", mailHost);
         status.put("mailPort", mailPort);
         status.put("mailUsername", mailUsername);
         status.put("isPasswordConfigured", isPasswordValid);
-        status.put("passwordStatus", isPasswordValid ? "CONFIGURED (Length: " + mailPassword.length() + ")" :
+        status.put("passwordStatus", isPasswordValid ? "CONFIGURED (Length: " + sanitizedPassword.length() + ")" :
                 (isPasswordDefault ? "USING_DEFAULT_PLACEHOLDER ('your-gmail-app-password-here')" : "EMPTY"));
         status.put("javaMailSenderBean", mailSender != null ? mailSender.getClass().getName() : "MISSING");
 
