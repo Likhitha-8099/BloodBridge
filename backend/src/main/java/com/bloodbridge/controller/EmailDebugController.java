@@ -70,6 +70,44 @@ public class EmailDebugController {
         return email.charAt(0) + "***" + email.substring(at);
     }
 
+    @Operation(summary = "Probe Outbound SMTP Network Connectivity", description = "Tests TCP socket connectivity from host to Gmail SMTP ports 465 and 587.")
+    @GetMapping("/smtp-probe")
+    public ResponseEntity<Map<String, Object>> probeSmtpPorts() {
+        Map<String, Object> report = new HashMap<>();
+        report.put("targetHost", mailHost);
+        report.put("configuredPort", mailPort);
+        report.put("configuredMode", mailPort == 465 ? "SMTPS" : "STARTTLS");
+        report.put("isUsernameConfigured", mailUsername != null && !mailUsername.isBlank());
+
+        // Probe Port 465
+        Map<String, Object> port465Result = new HashMap<>();
+        try (java.net.Socket socket = new java.net.Socket()) {
+            long t0 = System.currentTimeMillis();
+            socket.connect(new java.net.InetSocketAddress(mailHost, 465), 5000);
+            port465Result.put("reachable", true);
+            port465Result.put("latencyMs", System.currentTimeMillis() - t0);
+        } catch (Exception e) {
+            port465Result.put("reachable", false);
+            port465Result.put("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+        report.put("port465Probe", port465Result);
+
+        // Probe Port 587
+        Map<String, Object> port587Result = new HashMap<>();
+        try (java.net.Socket socket = new java.net.Socket()) {
+            long t0 = System.currentTimeMillis();
+            socket.connect(new java.net.InetSocketAddress(mailHost, 587), 5000);
+            port587Result.put("reachable", true);
+            port587Result.put("latencyMs", System.currentTimeMillis() - t0);
+        } catch (Exception e) {
+            port587Result.put("reachable", false);
+            port587Result.put("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+        report.put("port587Probe", port587Result);
+
+        return ResponseEntity.ok(report);
+    }
+
     @Operation(summary = "Check SMTP Configuration", description = "Returns Spring Mail configuration, JavaMailSender status, and template availability.")
     @GetMapping("/smtp-status")
     public ResponseEntity<Map<String, Object>> getSmtpStatus() {
