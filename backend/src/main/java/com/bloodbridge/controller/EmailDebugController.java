@@ -74,10 +74,10 @@ public class EmailDebugController {
 
         status.put("mailHost", mailHost);
         status.put("mailPort", mailPort);
-        status.put("mailUsername", mailUsername);
+        status.put("mailUsername", mailUsername != null && !mailUsername.isBlank() ? mailUsername : "NOT_CONFIGURED");
         status.put("isPasswordConfigured", isPasswordValid);
-        status.put("passwordStatus", isPasswordValid ? "CONFIGURED (Length: " + sanitizedPassword.length() + ")" :
-                (isPasswordDefault ? "USING_DEFAULT_PLACEHOLDER ('your-gmail-app-password-here')" : "EMPTY"));
+        status.put("passwordStatus", isPasswordValid ? "CONFIGURED" : "EMPTY");
+        status.put("smtpMode", mailPort == 465 ? "SMTPS" : "STARTTLS");
         status.put("javaMailSenderBean", mailSender != null ? mailSender.getClass().getName() : "MISSING");
 
         boolean templateExists = false;

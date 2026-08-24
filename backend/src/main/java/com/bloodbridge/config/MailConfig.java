@@ -67,12 +67,11 @@ public class MailConfig {
         props.put("mail.smtp.writetimeout", "10000");
 
         boolean pwdSet = !sanitizedPassword.isEmpty() && !"your-gmail-app-password-here".equals(sanitizedPassword);
-        log.info("[MAIL-CONFIG] JavaMailSender bean initialized successfully:");
-        log.info(" - Host               : {}", host);
-        log.info(" - Port               : {}", port);
-        log.info(" - Sender Email       : {}", username);
-        log.info(" - Password Configured: {}", pwdSet);
-        log.info(" - STARTTLS Enabled   : {}", starttlsEnable);
+        boolean isSsl = (port == 465);
+        log.info("[EMAIL] SMTP Host: {}", host != null && !host.isBlank() ? host : "smtp.gmail.com");
+        log.info("[EMAIL] SMTP Port: {}", port > 0 ? port : 587);
+        log.info("[EMAIL] SMTP Mode: {}", isSsl ? "SMTPS" : "STARTTLS");
+        log.info("[EMAIL] SMTP Configured: {}", pwdSet);
 
         return mailSender;
     }
