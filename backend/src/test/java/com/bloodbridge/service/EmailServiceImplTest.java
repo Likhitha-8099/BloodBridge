@@ -114,4 +114,49 @@ class EmailServiceImplTest {
         emailService.sendMatchNotificationEmail("donor@example.com", "B_NEGATIVE", "City Clinic");
         verify(mailSender, times(1)).send(any(SimpleMailMessage.class));
     }
+
+    @Test
+    void sendHospitalApproval_Success() {
+        emailService.sendHospitalApproval("hospital.admin@example.com", "Apollo Hospital");
+        verify(mailSender, times(1)).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void sendDonationCertificateEmail_Success() {
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        byte[] pdfBytes = "Sample Certificate PDF Bytes".getBytes();
+
+        emailService.sendDonationCertificateEmail(
+                "donor@example.com",
+                "Rahul Sharma",
+                "Apollo Hospital",
+                "O_POSITIVE",
+                1,
+                "2026-08-24",
+                "CERT-12345",
+                pdfBytes
+        );
+
+        verify(mailSender, times(1)).createMimeMessage();
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void sendDonorAcceptanceEmailToHospital_Success() {
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        emailService.sendDonorAcceptanceEmailToHospital(
+                "admin@apollo.org",
+                "Apollo Hospital",
+                "Rahul Sharma",
+                "O_POSITIVE",
+                501L,
+                2,
+                3.5,
+                "2026-08-24 16:30:00"
+        );
+
+        verify(mailSender, times(1)).createMimeMessage();
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+    }
 }
