@@ -2,10 +2,12 @@ package com.bloodbridge.service;
 
 import com.bloodbridge.dto.EmergencyMailDto;
 import com.bloodbridge.service.impl.EmailServiceImpl;
+import com.bloodbridge.service.impl.HttpApiEmailTransportServiceImpl;
+import com.bloodbridge.service.impl.SmtpEmailTransportServiceImpl;
 import jakarta.mail.internet.MimeMessage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.SimpleMailMessage;
@@ -15,7 +17,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for {@link EmailServiceImpl}.
+ * Unit tests for {@link EmailServiceImpl} validating dual transport operation.
  */
 @ExtendWith(MockitoExtension.class)
 class EmailServiceImplTest {
@@ -29,8 +31,16 @@ class EmailServiceImplTest {
     @Mock
     private com.bloodbridge.repository.EmailNotificationRepository emailNotificationRepository;
 
-    @InjectMocks
+    private SmtpEmailTransportServiceImpl smtpTransport;
+    private HttpApiEmailTransportServiceImpl httpApiTransport;
     private EmailServiceImpl emailService;
+
+    @BeforeEach
+    void setUp() {
+        smtpTransport = new SmtpEmailTransportServiceImpl(mailSender);
+        httpApiTransport = new HttpApiEmailTransportServiceImpl();
+        emailService = new EmailServiceImpl(smtpTransport, httpApiTransport, emailNotificationRepository);
+    }
 
     @Test
     void sendEmail_Success() {

@@ -47,7 +47,9 @@ public class EmergencyEmailDispatchFlowTest {
 
     @BeforeEach
     void setUp() {
-        emailService = new EmailServiceImpl(mailSender, emailNotificationRepository);
+        com.bloodbridge.service.impl.SmtpEmailTransportServiceImpl smtpTransport = new com.bloodbridge.service.impl.SmtpEmailTransportServiceImpl(mailSender);
+        com.bloodbridge.service.impl.HttpApiEmailTransportServiceImpl httpApiTransport = new com.bloodbridge.service.impl.HttpApiEmailTransportServiceImpl();
+        emailService = new EmailServiceImpl(smtpTransport, httpApiTransport, emailNotificationRepository);
         emailService.init();
         emailNotificationChannel = new EmailNotificationChannel(emailService);
     }

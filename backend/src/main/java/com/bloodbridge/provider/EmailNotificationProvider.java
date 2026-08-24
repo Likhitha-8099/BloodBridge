@@ -3,27 +3,29 @@ package com.bloodbridge.provider;
 import com.bloodbridge.entity.Notification;
 import com.bloodbridge.enums.DeliveryChannel;
 import com.bloodbridge.enums.NotificationStatus;
+import com.bloodbridge.service.EmailTransportService;
+import com.bloodbridge.service.impl.HttpApiEmailTransportServiceImpl;
+import com.bloodbridge.service.impl.SmtpEmailTransportServiceImpl;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDateTime;
 
 /**
- * Strategy provider for Email notifications using Spring Mail and HTML templates.
+ * Strategy provider for Email notifications using dual SMTP and HTTPS REST API transport.
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class EmailNotificationProvider implements NotificationProvider {
 
-    @Autowired(required = false)
-    private JavaMailSender mailSender;
+    private final SmtpEmailTransportServiceImpl smtpTransport;
+    private final HttpApiEmailTransportServiceImpl httpApiTransport;
 
-    @org.springframework.beans.factory.annotation.Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:}}}")
-    private String fromEmail;
+    @Value("${EMAIL_PROVIDER:${app.email.provider:smtp}}")
+    private String emailProvider;
 
     @Override
     public boolean supports(DeliveryChannel channel) {
@@ -35,6 +37,13 @@ public class EmailNotificationProvider implements NotificationProvider {
         int atIndex = email.indexOf('@');
         if (atIndex <= 1) return "***" + email.substring(Math.max(0, atIndex));
         return email.charAt(0) + "***" + email.substring(atIndex);
+    }
+
+    private EmailTransportService getActiveTransport() {
+        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider) || httpApiTransport.isConfigured()) {
+            return httpApiTransport;
+        }
+        return smtpTransport;
     }
 
     @Override
@@ -50,23 +59,9 @@ public class EmailNotificationProvider implements NotificationProvider {
         }
 
         try {
-            if (mailSender != null) {
-                MimeMessage mimeMessage = mailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-                String senderEmail = (fromEmail != null && !fromEmail.isBlank())
-                        ? fromEmail
-                        : (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl
-                            ? ((org.springframework.mail.javamail.JavaMailSenderImpl) mailSender).getUsername()
-                            : "noreply@bloodbridge.com");
-                helper.setFrom(senderEmail != null && !senderEmail.isBlank() ? senderEmail : "noreply@bloodbridge.com", "BloodBridge System");
-                helper.setSubject(notification.getTitle());
-                helper.setText(buildHtmlEmailBody(notification), true);
-                mailSender.send(mimeMessage);
-                log.info("[EMAIL] Notification email successfully sent | Recipient: {}", maskedRecipient);
-            } else {
-                log.info("[EMAIL - SIMULATION] MailSender not configured. Email logged: To={}, Title={}",
-                        maskedRecipient, notification.getTitle());
-            }
+            EmailTransportService transport = getActiveTransport();
+            transport.sendHtmlEmail(recipientEmail, notification.getTitle(), buildHtmlEmailBody(notification), "BloodBridge System", null, null);
+            log.info("[EMAIL] Notification email successfully sent via {} | Recipient: {}", transport.getProviderName(), maskedRecipient);
 
             notification.setStatus(NotificationStatus.SENT);
             notification.setSentAt(LocalDateTime.now());

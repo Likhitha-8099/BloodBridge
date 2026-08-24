@@ -2,50 +2,40 @@ package com.bloodbridge.service.impl;
 
 import com.bloodbridge.dto.EmergencyMailDto;
 import com.bloodbridge.service.EmailService;
-import jakarta.mail.internet.MimeMessage;
+import com.bloodbridge.service.EmailTransportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Service implementation for asynchronous email operations utilizing Spring Mail and MimeMessageHelper.
+ * Service implementation for asynchronous email operations in BloodBridge.
+ * Dynamically routes delivery through either local Gmail SMTP or production HTTPS REST API (Resend / Brevo).
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailServiceImpl implements EmailService {
 
-    private final JavaMailSender mailSender;
+    private final SmtpEmailTransportServiceImpl smtpTransport;
+    private final HttpApiEmailTransportServiceImpl httpApiTransport;
     private final com.bloodbridge.repository.EmailNotificationRepository emailNotificationRepository;
 
-    @Value("${SPRING_MAIL_HOST:${MAIL_HOST:${spring.mail.host:smtp.gmail.com}}}")
-    private String mailHost;
-
-    @Value("${SPRING_MAIL_PORT:${MAIL_PORT:${spring.mail.port:587}}}")
-    private int mailPort;
-
-    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:}}}")
-    private String fromEmail;
-
-    @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:${spring.mail.password:}}}")
-    private String mailPassword;
+    @Value("${EMAIL_PROVIDER:${app.email.provider:smtp}}")
+    private String emailProvider;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
     private volatile String cachedEmergencyHtmlTemplate = null;
+    private final Set<String> processedEmailKeys = ConcurrentHashMap.newKeySet();
 
-    /**
-     * Safely masks an email address for production logging (e.g. l***@gmail.com).
-     */
     private String maskEmail(String email) {
         if (email == null || email.isBlank()) {
             return "[MISSING_EMAIL]";
@@ -57,22 +47,22 @@ public class EmailServiceImpl implements EmailService {
         return email.charAt(0) + "***" + email.substring(atIndex);
     }
 
-    private boolean isSmtpPasswordConfigured() {
-        return mailPassword != null && !mailPassword.isBlank() && !"your-gmail-app-password-here".equals(mailPassword.trim());
+    private EmailTransportService getActiveTransport() {
+        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider) || httpApiTransport.isConfigured()) {
+            return httpApiTransport;
+        }
+        return smtpTransport;
     }
 
     @jakarta.annotation.PostConstruct
     public void init() {
-        boolean pwdSet = isSmtpPasswordConfigured();
+        EmailTransportService transport = getActiveTransport();
         log.info("================================================================================");
-        log.info("[EMAIL] EmailServiceImpl Initialized with Spring Mail configuration:");
-        log.info("[EMAIL]  - SMTP Host           : {}", mailHost);
-        log.info("[EMAIL]  - SMTP Port           : {}", mailPort);
-        log.info("[EMAIL]  - Sender / From Email : {}", fromEmail);
-        log.info("[EMAIL]  - SMTP Configured     : {}", pwdSet);
-        log.info("[EMAIL]  - JavaMailSender Bean : {}", mailSender != null ? mailSender.getClass().getName() : "NULL");
+        log.info("[EMAIL] EmailServiceImpl Initialized:");
+        log.info("[EMAIL]  - Active Transport Mode : {}", transport.getProviderName());
+        log.info("[EMAIL]  - Transport Configured  : {}", transport.isConfigured());
         getEmergencyHtmlTemplate();
-        log.info("[EMAIL]  - Emergency Template  : {}", cachedEmergencyHtmlTemplate != null ? "CACHED" : "UNAVAILABLE");
+        log.info("[EMAIL]  - Emergency Template    : {}", cachedEmergencyHtmlTemplate != null ? "CACHED" : "UNAVAILABLE");
         log.info("================================================================================");
     }
 
@@ -96,21 +86,6 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
-    private String getSenderEmail() {
-        if (fromEmail != null && !fromEmail.isBlank()) {
-            return fromEmail.trim();
-        }
-        if (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl) {
-            String u = ((org.springframework.mail.javamail.JavaMailSenderImpl) mailSender).getUsername();
-            if (u != null && !u.isBlank()) {
-                return u.trim();
-            }
-        }
-        return "noreply@bloodbridge.com";
-    }
-
-    private final java.util.Set<String> processedEmailKeys = java.util.concurrent.ConcurrentHashMap.newKeySet();
-
     @Override
     @Async("emergencyEmailExecutor")
     public void sendEmergencyAlert(EmergencyMailDto mailDto) {
@@ -120,7 +95,6 @@ public class EmailServiceImpl implements EmailService {
         Long reqId = mailDto != null ? mailDto.getRequestId() : null;
         Long donorId = mailDto != null ? mailDto.getDonorId() : null;
 
-        // Idempotency check: prevent duplicate emergency alert emails to the same donor for the same request
         if (reqId != null && donorId != null) {
             String idempotencyKey = reqId + "_" + donorId + "_EMERGENCY_ALERT";
             if (!processedEmailKeys.add(idempotencyKey)) {
@@ -130,7 +104,7 @@ public class EmailServiceImpl implements EmailService {
         }
 
         if (mailDto == null || recipientEmail == null || recipientEmail.isBlank()) {
-            log.warn("[EMAIL-EMERGENCY-FAILED] Failed to send emergency request email: missing or blank recipient email for Request #{}, Donor #{}",
+            log.warn("[EMAIL-EMERGENCY-FAILED] Missing or blank recipient email for Request #{}, Donor #{}",
                     reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
             return;
         }
@@ -144,7 +118,7 @@ public class EmailServiceImpl implements EmailService {
 
             String htmlTemplate = getEmergencyHtmlTemplate();
             if (htmlTemplate == null || htmlTemplate.isBlank()) {
-                log.error("[EMAIL] SMTP SEND FAILED | Error type: IllegalStateException | Error message: Emergency HTML template missing | Recipient: {}", maskedRecipient);
+                log.error("[EMAIL] SEND FAILED | Error type: IllegalStateException | Error message: Emergency HTML template missing | Recipient: {}", maskedRecipient);
                 recordEmailNotification(reqId, donorId, recipientEmail, false, 0, "Emergency HTML template missing");
                 return;
             }
@@ -167,27 +141,16 @@ public class EmailServiceImpl implements EmailService {
                     .replace("{reason}", mailDto.getReason() != null ? mailDto.getReason() : "Emergency Requirement")
                     .replace("{loginUrl}", mailDto.getLoginUrl() != null ? mailDto.getLoginUrl() : (frontendUrl + "/donor/requests"));
 
-            String senderEmail = getSenderEmail();
+            EmailTransportService transport = getActiveTransport();
+            log.info("[EMAIL] Starting dispatch via {} | Recipient: {}", transport.getProviderName(), maskedRecipient);
+            transport.sendHtmlEmail(recipientEmail, subject, htmlBody, "BloodBridge Team", null, null);
 
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, StandardCharsets.UTF_8.name());
-
-            helper.setTo(recipientEmail);
-            helper.setSubject(subject);
-            helper.setFrom(senderEmail, "BloodBridge Team");
-            helper.setText(htmlBody, true);
-
-            log.info("[EMAIL] Starting SMTP send | Recipient: {}", maskedRecipient);
-            mailSender.send(mimeMessage);
             long durationMs = System.currentTimeMillis() - startTime;
-
-            log.info("[EMAIL] SMTP send completed successfully | Recipient: {} | Duration: {} ms",
-                    maskedRecipient, durationMs);
-
+            log.info("[EMAIL] Send completed successfully | Recipient: {} | Duration: {} ms", maskedRecipient, durationMs);
             recordEmailNotification(reqId, donorId, recipientEmail, true, durationMs, null);
         } catch (Exception e) {
             long durationMs = System.currentTimeMillis() - startTime;
-            log.error("[EMAIL] SMTP SEND FAILED | Error type: {} | Error message: {} | Recipient: {} | Request #{}, Donor #{}",
+            log.error("[EMAIL] SEND FAILED | Error type: {} | Error message: {} | Recipient: {} | Request #{}, Donor #{}",
                     e.getClass().getSimpleName(), e.getMessage(), maskedRecipient, reqId != null ? reqId : "N/A", donorId != null ? donorId : "N/A");
 
             recordEmailNotification(reqId, donorId, recipientEmail, false, durationMs, e.getMessage());
@@ -261,16 +224,11 @@ public class EmailServiceImpl implements EmailService {
         log.info("[EMAIL] Initiating async simple email dispatch | Recipient: {} | Subject: {} | Thread: {}",
                 maskedRecipient, subject, Thread.currentThread().getName());
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(to);
-            message.setFrom(getSenderEmail());
-            message.setSubject(subject);
-            message.setText(content);
-            log.info("[EMAIL] Starting SMTP send | Recipient: {}", maskedRecipient);
-            mailSender.send(message);
-            log.info("[EMAIL] SMTP send completed successfully | Recipient: {}", maskedRecipient);
+            EmailTransportService transport = getActiveTransport();
+            transport.sendSimpleEmail(to, subject, content, "BloodBridge Team");
+            log.info("[EMAIL] Simple email dispatched successfully via {} | Recipient: {}", transport.getProviderName(), maskedRecipient);
         } catch (Exception e) {
-            log.error("[EMAIL] SMTP SEND FAILED | Error type: {} | Error message: {} | Recipient: {}",
+            log.error("[EMAIL] SEND FAILED | Error type: {} | Error message: {} | Recipient: {}",
                     e.getClass().getSimpleName(), e.getMessage(), maskedRecipient);
         }
     }
@@ -341,7 +299,6 @@ public class EmailServiceImpl implements EmailService {
             return;
         }
 
-        // Idempotency check: prevent sending duplicate certificate emails for the same certificate ID
         if (certificateId != null && !certificateId.isBlank()) {
             String idempotencyKey = certificateId + "_CERTIFICATE_EMAIL";
             if (!processedEmailKeys.add(idempotencyKey)) {
@@ -360,41 +317,36 @@ public class EmailServiceImpl implements EmailService {
         String displayHospital = hospitalName != null ? hospitalName : "Partner Hospital";
         String displayCertId = certificateId != null ? certificateId : "CERT-BB";
 
-        String content = String.format(
-                "Dear %s,\n\n" +
-                "Your blood donation at %s has been successfully recorded as COMPLETED.\n\n" +
-                "Donation Summary:\n" +
-                "- Donor Name: %s\n" +
-                "- Hospital Name: %s\n" +
-                "- Blood Group: %s\n" +
-                "- Units Donated: %d\n" +
-                "- Donation Date: %s\n" +
-                "- Certificate ID: %s\n\n" +
-                "Your official BloodBridge donation certificate is attached to this email. Thank you for saving lives!\n\n" +
-                "Best regards,\nBloodBridge Team",
+        String htmlContent = String.format(
+                "<!DOCTYPE html><html><body style=\"font-family: Arial, sans-serif; color: #333; line-height: 1.6;\">" +
+                "<div style=\"max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;\">" +
+                "<h2 style=\"color: #e53935;\">🩸 Official Blood Donation Certificate</h2>" +
+                "<p>Dear <strong>%s</strong>,</p>" +
+                "<p>Your blood donation at <strong>%s</strong> has been recorded as <strong>COMPLETED</strong>.</p>" +
+                "<table style=\"width: 100%%; border-collapse: collapse; margin: 20px 0;\">" +
+                "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Donor Name:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\">%s</td></tr>" +
+                "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Hospital:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\">%s</td></tr>" +
+                "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Blood Group:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\">%s</td></tr>" +
+                "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Units Donated:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\">%d</td></tr>" +
+                "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Date:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\">%s</td></tr>" +
+                "<tr><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\"><strong>Certificate ID:</strong></td><td style=\"padding: 8px; border-bottom: 1px solid #ddd;\">%s</td></tr>" +
+                "</table>" +
+                "<p>Your official BloodBridge donation certificate is attached to this email. Thank you for saving lives!</p>" +
+                "<hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">" +
+                "<p style=\"font-size: 12px; color: #777;\">BloodBridge Lifesaving Network System Notification</p>" +
+                "</div></body></html>",
                 displayDonor, displayHospital, displayDonor, displayHospital, formattedBg,
                 units != null ? units : 1, donationDate != null ? donationDate : "Recent", displayCertId
         );
 
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
-            helper.setTo(toEmail);
-            helper.setFrom(getSenderEmail(), "BloodBridge Team");
-            helper.setSubject(subject);
-            helper.setText(content);
-
-            if (pdfBytes != null && pdfBytes.length > 0) {
-                String filename = "BloodBridge_Certificate_" + (certificateId != null ? certificateId : "Donation") + ".pdf";
-                helper.addAttachment(filename, new org.springframework.core.io.ByteArrayResource(pdfBytes));
-            }
-
-            log.info("[EMAIL] Starting SMTP send with attached PDF | Recipient: {} | Certificate ID: {}", maskedRecipient, certificateId);
-            mailSender.send(message);
-            log.info("[EMAIL] SMTP send completed successfully | Recipient: {} | Certificate ID: {}",
-                    maskedRecipient, certificateId);
+            EmailTransportService transport = getActiveTransport();
+            String filename = "BloodBridge_Certificate_" + (certificateId != null ? certificateId : "Donation") + ".pdf";
+            transport.sendHtmlEmail(toEmail, subject, htmlContent, "BloodBridge Team", pdfBytes, filename);
+            log.info("[EMAIL] Certificate PDF email successfully delivered via {} | Recipient: {} | Certificate ID: {}",
+                    transport.getProviderName(), maskedRecipient, certificateId);
         } catch (Exception e) {
-            log.error("[EMAIL] SMTP SEND FAILED | Error type: {} | Error message: {} | Recipient: {} | Certificate ID: {}",
+            log.error("[EMAIL] SEND FAILED | Error type: {} | Error message: {} | Recipient: {} | Certificate ID: {}",
                     e.getClass().getSimpleName(), e.getMessage(), maskedRecipient, certificateId);
         }
     }
@@ -449,21 +401,12 @@ public class EmailServiceImpl implements EmailService {
                     "<p style=\"font-size: 12px; color: #777;\">BloodBridge Emergency Blood Network System Notification</p>" +
                     "</div></body></html>";
 
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-
-            helper.setTo(toHospitalEmail);
-            helper.setSubject(subject);
-            helper.setFrom(getSenderEmail(), "BloodBridge Network");
-            helper.setText(htmlBody, true);
-
-            log.info("[EMAIL] Starting SMTP send | Recipient: {} | Request ID: #{}", maskedRecipient, requestId);
-            mailSender.send(mimeMessage);
-
-            log.info("[EMAIL] SMTP send completed successfully | Recipient: {} | Request ID: #{}",
-                    maskedRecipient, requestId);
+            EmailTransportService transport = getActiveTransport();
+            transport.sendHtmlEmail(toHospitalEmail, subject, htmlBody, "BloodBridge Network", null, null);
+            log.info("[EMAIL] Donor acceptance email sent successfully via {} | Recipient: {} | Request ID: #{}",
+                    transport.getProviderName(), maskedRecipient, requestId);
         } catch (Exception e) {
-            log.error("[EMAIL] SMTP SEND FAILED | Error type: {} | Error message: {} | Recipient: {} | Request ID: #{}",
+            log.error("[EMAIL] SEND FAILED | Error type: {} | Error message: {} | Recipient: {} | Request ID: #{}",
                     e.getClass().getSimpleName(), e.getMessage(), maskedRecipient, requestId);
             processedEmailKeys.remove(idempotencyKey);
         }

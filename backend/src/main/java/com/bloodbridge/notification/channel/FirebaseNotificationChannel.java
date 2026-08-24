@@ -93,7 +93,7 @@ public class FirebaseNotificationChannel implements NotificationChannel {
                 log.info("[FCM-Stage 4] Dispatching FCM message to device ID: {}", deviceToken.getId());
                 String messageId = null;
 
-                if (!FirebaseApp.getApps().isEmpty()) {
+                if (firebaseEnabled && !FirebaseApp.getApps().isEmpty()) {
                     try {
                         messageId = FirebaseMessaging.getInstance().send(firebaseMessage);
                     } catch (FirebaseMessagingException fme) {
@@ -105,7 +105,7 @@ public class FirebaseNotificationChannel implements NotificationChannel {
                         }
                     }
                 } else {
-                    log.warn("[FCM-Stage 4] FirebaseApp not initialized; skipping live FCM API dispatch.");
+                    log.warn("[FCM-Stage 4] FirebaseApp not active or firebase.enabled=false; simulating live FCM API dispatch.");
                     messageId = "mock-fcm-msg-" + System.currentTimeMillis();
                 }
 

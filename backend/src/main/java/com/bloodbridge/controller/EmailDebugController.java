@@ -108,7 +108,12 @@ public class EmailDebugController {
         return ResponseEntity.ok(report);
     }
 
-    @Operation(summary = "Check SMTP Configuration", description = "Returns Spring Mail configuration, JavaMailSender status, and template availability.")
+    private final com.bloodbridge.service.impl.HttpApiEmailTransportServiceImpl httpApiTransport;
+
+    @Value("${EMAIL_PROVIDER:${app.email.provider:smtp}}")
+    private String emailProvider;
+
+    @Operation(summary = "Check SMTP and HTTPS Email Configuration", description = "Returns Email transport configuration, JavaMailSender status, API status, and template availability.")
     @GetMapping("/smtp-status")
     public ResponseEntity<Map<String, Object>> getSmtpStatus() {
         Map<String, Object> status = new HashMap<>();
@@ -117,10 +122,14 @@ public class EmailDebugController {
         boolean isPasswordEmpty = sanitizedPassword.isEmpty();
         boolean isPasswordValid = !isPasswordEmpty && !isPasswordDefault;
 
+        status.put("emailProvider", emailProvider);
+        status.put("activeTransport", httpApiTransport.isConfigured() || "resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider)
+                ? httpApiTransport.getProviderName() : "GMAIL_SMTP");
+        status.put("isHttpApiConfigured", httpApiTransport.isConfigured());
         status.put("mailHost", mailHost);
         status.put("mailPort", mailPort);
         status.put("mailUsername", maskEmail(mailUsername));
-        status.put("isPasswordConfigured", isPasswordValid);
+        status.put("isSmtpPasswordConfigured", isPasswordValid);
         status.put("passwordStatus", isPasswordValid ? "CONFIGURED" : "EMPTY");
         status.put("smtpMode", mailPort == 465 ? "SMTPS" : "STARTTLS");
         status.put("javaMailSenderBean", mailSender != null ? mailSender.getClass().getName() : "MISSING");
