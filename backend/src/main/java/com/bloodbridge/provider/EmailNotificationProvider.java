@@ -53,9 +53,12 @@ public class EmailNotificationProvider implements NotificationProvider {
             if (mailSender != null) {
                 MimeMessage mimeMessage = mailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-                helper.setTo(recipientEmail);
-                String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@bloodbridge.com";
-                helper.setFrom(senderEmail, "BloodBridge System");
+                String senderEmail = (fromEmail != null && !fromEmail.isBlank())
+                        ? fromEmail
+                        : (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl
+                            ? ((org.springframework.mail.javamail.JavaMailSenderImpl) mailSender).getUsername()
+                            : "noreply@bloodbridge.com");
+                helper.setFrom(senderEmail != null && !senderEmail.isBlank() ? senderEmail : "noreply@bloodbridge.com", "BloodBridge System");
                 helper.setSubject(notification.getTitle());
                 helper.setText(buildHtmlEmailBody(notification), true);
                 mailSender.send(mimeMessage);

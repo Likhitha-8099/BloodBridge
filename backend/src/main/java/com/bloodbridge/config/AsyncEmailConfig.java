@@ -1,8 +1,10 @@
 package com.bloodbridge.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -10,12 +12,12 @@ import java.util.concurrent.Executor;
 
 /**
  * Dedicated ThreadPoolTaskExecutor configuration for emergency email dispatches.
- * Controls SMTP concurrency, queueing, and thread management.
+ * Controls SMTP concurrency, queueing, and thread management with safe uncaught exception handling.
  */
 @Configuration
 @EnableAsync
 @Slf4j
-public class AsyncEmailConfig {
+public class AsyncEmailConfig implements AsyncConfigurer {
 
     @Bean(name = "emergencyEmailExecutor")
     public Executor emergencyEmailExecutor() {
@@ -29,5 +31,13 @@ public class AsyncEmailConfig {
         executor.setAwaitTerminationSeconds(60);
         executor.initialize();
         return executor;
+    }
+
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return (throwable, method, params) -> {
+            log.error("[EMAIL-ASYNC-ERROR] Uncaught exception in async method: {} - Type: {}, Message: {}",
+                    method.getName(), throwable.getClass().getSimpleName(), throwable.getMessage());
+        };
     }
 }

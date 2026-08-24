@@ -157,8 +157,13 @@ public class EmailDebugController {
 
         // Stage 3 & 4: MimeMessage Creation & SMTP Dispatch
         try {
-            String safeRecipient = recipientEmail != null ? recipientEmail : "";
-            String safeSender = mailUsername != null && !mailUsername.isBlank() ? mailUsername : "noreply@bloodbridge.com";
+            String safeSender = (mailUsername != null && !mailUsername.isBlank())
+                    ? mailUsername
+                    : (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl
+                        ? ((org.springframework.mail.javamail.JavaMailSenderImpl) mailSender).getUsername()
+                        : "noreply@bloodbridge.com");
+
+            String safeRecipient = (recipientEmail != null && !recipientEmail.isBlank()) ? recipientEmail : safeSender;
 
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -167,19 +172,19 @@ public class EmailDebugController {
             helper.setSubject("🚨 [TEST] BloodBridge Emergency Alert Pipeline Verification");
             helper.setFrom(safeSender, "BloodBridge System");
             helper.setText(htmlBody, true);
-            log.info("Stage 3: MimeMessage created successfully with sender: {}", mailUsername);
+            log.info("Stage 3: MimeMessage created successfully with sender: {}", safeSender);
 
             log.info("Stage 4: Connecting & Authenticating with SMTP server {}:{}...", mailHost, mailPort);
             mailSender.send(message);
 
-            log.info("Stage 5: Email sent successfully via SMTP to {}", recipientEmail);
+            log.info("Stage 5: Email sent successfully via SMTP to {}", safeRecipient);
             log.info("================================================================================");
             report.put("status", "SUCCESS");
-            report.put("message", "Test emergency HTML email was successfully sent via SMTP to " + recipientEmail);
+            report.put("message", "Test emergency HTML email was successfully sent via SMTP to " + safeRecipient);
 
             // Also trigger async service method to ensure async path functions
             EmergencyMailDto mailDto = EmergencyMailDto.builder()
-                    .toEmail(recipientEmail)
+                    .toEmail(safeRecipient)
                     .donorName("Test Donor (Async)")
                     .hospitalName("BloodBridge Test Hospital")
                     .bloodGroup("A_POSITIVE")
