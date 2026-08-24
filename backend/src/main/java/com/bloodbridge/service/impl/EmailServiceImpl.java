@@ -32,7 +32,7 @@ public class EmailServiceImpl implements EmailService {
     @Value("${SPRING_MAIL_PORT:${MAIL_PORT:${spring.mail.port:587}}}")
     private int mailPort;
 
-    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:your_email@gmail.com}}}")
+    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:}}}")
     private String fromEmail;
 
     @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:${spring.mail.password:}}}")
@@ -153,7 +153,7 @@ public class EmailServiceImpl implements EmailService {
                     .replace("{reason}", mailDto.getReason() != null ? mailDto.getReason() : "Emergency Requirement")
                     .replace("{loginUrl}", mailDto.getLoginUrl() != null ? mailDto.getLoginUrl() : (frontendUrl + "/donor/requests"));
 
-            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "your_email@gmail.com";
+            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@bloodbridge.com";
 
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, StandardCharsets.UTF_8.name());
@@ -248,7 +248,7 @@ public class EmailServiceImpl implements EmailService {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
-            message.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "your_email@gmail.com");
+            message.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@bloodbridge.com");
             message.setSubject(subject);
             message.setText(content);
             mailSender.send(message);
@@ -364,7 +364,7 @@ public class EmailServiceImpl implements EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setTo(toEmail);
-            helper.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "your_email@gmail.com");
+            helper.setFrom((fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@bloodbridge.com");
             helper.setSubject(subject);
             helper.setText(content);
 
@@ -435,7 +435,7 @@ public class EmailServiceImpl implements EmailService {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "your_email@gmail.com";
+            String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@bloodbridge.com";
             helper.setTo(toHospitalEmail);
             helper.setSubject(subject);
             helper.setFrom(senderEmail, "BloodBridge Network");

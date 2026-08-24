@@ -23,7 +23,7 @@ public class MailConfig {
     @Value("${SPRING_MAIL_PORT:${MAIL_PORT:${spring.mail.port:587}}}")
     private int port;
 
-    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:your_email@gmail.com}}}")
+    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:}}}")
     private String username;
 
     @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:${spring.mail.password:}}}")
@@ -40,7 +40,7 @@ public class MailConfig {
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
         mailSender.setHost(host != null && !host.isBlank() ? host.trim() : "smtp.gmail.com");
         mailSender.setPort(port > 0 ? port : 587);
-        mailSender.setUsername(username != null && !username.isBlank() ? username.trim() : "your_email@gmail.com");
+        mailSender.setUsername(username != null && !username.isBlank() ? username.trim() : "");
 
         // Sanitize password: trim whitespace and strip space separators often copied from Google App Password UI
         String sanitizedPassword = password != null ? password.trim().replace(" ", "") : "";

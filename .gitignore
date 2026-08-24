@@ -46,3 +46,6 @@ backend/src/main/resources/firebase/firebase-service-account.json
 **/firebase-service-account.json
 *-adminsdk-*.json
 
+# ──── Scratch Scripts ────
+scratch/
+

@@ -22,7 +22,7 @@ public class EmailNotificationProvider implements NotificationProvider {
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
-    @org.springframework.beans.factory.annotation.Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:your_email@gmail.com}}}")
+    @org.springframework.beans.factory.annotation.Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:}}}")
     private String fromEmail;
 
     @Override
@@ -54,7 +54,7 @@ public class EmailNotificationProvider implements NotificationProvider {
                 MimeMessage mimeMessage = mailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
                 helper.setTo(recipientEmail);
-                String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "your_email@gmail.com";
+                String senderEmail = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@bloodbridge.com";
                 helper.setFrom(senderEmail, "BloodBridge System");
                 helper.setSubject(notification.getTitle());
                 helper.setText(buildHtmlEmailBody(notification), true);

@@ -41,7 +41,7 @@ public class EmailDebugController {
     @Value("${SPRING_MAIL_PORT:${MAIL_PORT:${spring.mail.port:587}}}")
     private int mailPort;
 
-    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:your_email@gmail.com}}}")
+    @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${spring.mail.username:}}}")
     private String mailUsername;
 
     @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:${spring.mail.password:}}}")
@@ -93,12 +93,12 @@ public class EmailDebugController {
     @Operation(summary = "Send Test Emergency Email", description = "Triggers a test emergency HTML email dispatch via SMTP to verify the pipeline.")
     @RequestMapping(value = "/test-email", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> sendTestEmail(
-            @RequestParam(required = false, defaultValue = "your_email@gmail.com") String to,
+            @RequestParam(required = false) String to,
             @RequestBody(required = false) Map<String, String> body) {
 
         String recipientEmail = (body != null && body.containsKey("to") && !body.get("to").isBlank())
                 ? body.get("to")
-                : to;
+                : (to != null && !to.isBlank() ? to : mailUsername);
 
         log.info("================================================================================");
         log.info("Stage 1: Controller invoked for test email dispatch. Recipient: {}", recipientEmail);
@@ -119,7 +119,7 @@ public class EmailDebugController {
             report.put("error", isPasswordDefault ?
                     "MAIL_PASSWORD is still set to placeholder 'your-gmail-app-password-here'. Update spring.mail.password or set MAIL_PASSWORD environment variable with a valid Gmail App Password." :
                     "MAIL_PASSWORD is empty.");
-            report.put("fixInstruction", "1. Enable 2-Step Verification on Gmail account (" + mailUsername + "). 2. Generate a 16-character App Password at https://myaccount.google.com/apppasswords. 3. Set spring.mail.password=<16-char-app-password> in application.properties or set MAIL_PASSWORD env variable.");
+            report.put("fixInstruction", "1. Enable 2-Step Verification on Gmail account. 2. Generate a 16-character App Password at https://myaccount.google.com/apppasswords. 3. Set MAIL_PASSWORD environment variable.");
             log.error("[DEBUG-ENDPOINT] Configuration Check Failed: Invalid/default MAIL_PASSWORD.");
             return ResponseEntity.badRequest().body(report);
         }
@@ -158,7 +158,7 @@ public class EmailDebugController {
         // Stage 3 & 4: MimeMessage Creation & SMTP Dispatch
         try {
             String safeRecipient = recipientEmail != null ? recipientEmail : "";
-            String safeSender = mailUsername != null && !mailUsername.isBlank() ? mailUsername : "your_email@gmail.com";
+            String safeSender = mailUsername != null && !mailUsername.isBlank() ? mailUsername : "noreply@bloodbridge.com";
 
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
