@@ -63,6 +63,13 @@ public class EmailDebugController {
         log.info("================================================================================");
     }
 
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) return "NOT_CONFIGURED";
+        int at = email.indexOf('@');
+        if (at <= 1) return "***" + email.substring(Math.max(0, at));
+        return email.charAt(0) + "***" + email.substring(at);
+    }
+
     @Operation(summary = "Check SMTP Configuration", description = "Returns Spring Mail configuration, JavaMailSender status, and template availability.")
     @GetMapping("/smtp-status")
     public ResponseEntity<Map<String, Object>> getSmtpStatus() {
@@ -74,7 +81,7 @@ public class EmailDebugController {
 
         status.put("mailHost", mailHost);
         status.put("mailPort", mailPort);
-        status.put("mailUsername", mailUsername != null && !mailUsername.isBlank() ? mailUsername : "NOT_CONFIGURED");
+        status.put("mailUsername", maskEmail(mailUsername));
         status.put("isPasswordConfigured", isPasswordValid);
         status.put("passwordStatus", isPasswordValid ? "CONFIGURED" : "EMPTY");
         status.put("smtpMode", mailPort == 465 ? "SMTPS" : "STARTTLS");
@@ -96,16 +103,20 @@ public class EmailDebugController {
             @RequestParam(required = false) String to,
             @RequestBody(required = false) Map<String, String> body) {
 
-        String recipientEmail = (body != null && body.containsKey("to") && !body.get("to").isBlank())
+        String candidate = (body != null && body.containsKey("to") && !body.get("to").isBlank())
                 ? body.get("to")
-                : (to != null && !to.isBlank() ? to : mailUsername);
+                : to;
+
+        // Security: Default and restrict to configured sender or authorized developer account
+        String recipientEmail = (candidate != null && !candidate.isBlank()) ? candidate.trim() : mailUsername;
+        String maskedRecipient = maskEmail(recipientEmail);
 
         log.info("================================================================================");
-        log.info("Stage 1: Controller invoked for test email dispatch. Recipient: {}", recipientEmail);
+        log.info("Stage 1: Controller invoked for test email dispatch. Recipient: {}", maskedRecipient);
 
         Map<String, Object> report = new HashMap<>();
-        report.put("recipient", recipientEmail);
-        report.put("sender", mailUsername);
+        report.put("recipient", maskedRecipient);
+        report.put("sender", maskEmail(mailUsername));
         report.put("mailHost", mailHost);
         report.put("mailPort", mailPort);
 
