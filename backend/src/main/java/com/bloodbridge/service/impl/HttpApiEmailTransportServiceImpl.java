@@ -52,10 +52,13 @@ public class HttpApiEmailTransportServiceImpl implements EmailTransportService {
 
     @Override
     public boolean isConfigured() {
-        if ("brevo".equalsIgnoreCase(configuredProvider) || (brevoApiKey != null && !brevoApiKey.isBlank())) {
+        if ("brevo".equalsIgnoreCase(configuredProvider)) {
             return brevoApiKey != null && !brevoApiKey.isBlank();
         }
-        return resendApiKey != null && !resendApiKey.isBlank();
+        if ("resend".equalsIgnoreCase(configuredProvider)) {
+            return resendApiKey != null && !resendApiKey.isBlank();
+        }
+        return (resendApiKey != null && !resendApiKey.isBlank()) || (brevoApiKey != null && !brevoApiKey.isBlank());
     }
 
     @Override

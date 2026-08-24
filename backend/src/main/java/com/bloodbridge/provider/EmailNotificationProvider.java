@@ -40,7 +40,16 @@ public class EmailNotificationProvider implements NotificationProvider {
     }
 
     private EmailTransportService getActiveTransport() {
-        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider) || httpApiTransport.isConfigured()) {
+        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider)) {
+            return httpApiTransport;
+        }
+        if ("smtp".equalsIgnoreCase(emailProvider)) {
+            return smtpTransport;
+        }
+        if (smtpTransport.isConfigured()) {
+            return smtpTransport;
+        }
+        if (httpApiTransport.isConfigured()) {
             return httpApiTransport;
         }
         return smtpTransport;

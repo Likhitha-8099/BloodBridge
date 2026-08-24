@@ -122,9 +122,21 @@ public class EmailDebugController {
         boolean isPasswordEmpty = sanitizedPassword.isEmpty();
         boolean isPasswordValid = !isPasswordEmpty && !isPasswordDefault;
 
+        String activeTransportName;
+        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider)) {
+            activeTransportName = httpApiTransport.getProviderName();
+        } else if ("smtp".equalsIgnoreCase(emailProvider)) {
+            activeTransportName = "GMAIL_SMTP";
+        } else if (isPasswordValid) {
+            activeTransportName = "GMAIL_SMTP";
+        } else if (httpApiTransport.isConfigured()) {
+            activeTransportName = httpApiTransport.getProviderName();
+        } else {
+            activeTransportName = "GMAIL_SMTP";
+        }
+
         status.put("emailProvider", emailProvider);
-        status.put("activeTransport", httpApiTransport.isConfigured() || "resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider)
-                ? httpApiTransport.getProviderName() : "GMAIL_SMTP");
+        status.put("activeTransport", activeTransportName);
         status.put("isHttpApiConfigured", httpApiTransport.isConfigured());
         status.put("mailHost", mailHost);
         status.put("mailPort", mailPort);

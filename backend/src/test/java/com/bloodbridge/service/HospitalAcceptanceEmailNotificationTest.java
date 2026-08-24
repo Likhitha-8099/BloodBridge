@@ -2,7 +2,6 @@ package com.bloodbridge.service;
 
 import com.bloodbridge.entity.*;
 import com.bloodbridge.enums.BloodGroup;
-import com.bloodbridge.enums.NotificationType;
 import com.bloodbridge.enums.Role;
 import com.bloodbridge.enums.UrgencyLevel;
 import com.bloodbridge.repository.NotificationRepository;
@@ -20,7 +19,6 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**

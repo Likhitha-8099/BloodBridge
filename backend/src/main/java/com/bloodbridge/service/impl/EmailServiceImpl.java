@@ -48,7 +48,16 @@ public class EmailServiceImpl implements EmailService {
     }
 
     private EmailTransportService getActiveTransport() {
-        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider) || httpApiTransport.isConfigured()) {
+        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider)) {
+            return httpApiTransport;
+        }
+        if ("smtp".equalsIgnoreCase(emailProvider)) {
+            return smtpTransport;
+        }
+        if (smtpTransport.isConfigured()) {
+            return smtpTransport;
+        }
+        if (httpApiTransport.isConfigured()) {
             return httpApiTransport;
         }
         return smtpTransport;
@@ -348,6 +357,9 @@ public class EmailServiceImpl implements EmailService {
         } catch (Exception e) {
             log.error("[EMAIL] SEND FAILED | Error type: {} | Error message: {} | Recipient: {} | Certificate ID: {}",
                     e.getClass().getSimpleName(), e.getMessage(), maskedRecipient, certificateId);
+            if (certificateId != null && !certificateId.isBlank()) {
+                processedEmailKeys.remove(certificateId + "_CERTIFICATE_EMAIL");
+            }
         }
     }
 
