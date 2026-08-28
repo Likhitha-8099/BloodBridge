@@ -9,13 +9,17 @@ import com.bloodbridge.entity.User;
 import com.bloodbridge.enums.BloodGroup;
 import com.bloodbridge.enums.DonationStatus;
 import com.bloodbridge.enums.Gender;
+import com.bloodbridge.enums.RequestStatus;
 import com.bloodbridge.enums.Role;
+import com.bloodbridge.enums.UrgencyLevel;
 import com.bloodbridge.exception.InvalidDonationStateException;
 import com.bloodbridge.exception.UnauthorizedDonationAccessException;
+import com.bloodbridge.repository.BloodRequestRepository;
 import com.bloodbridge.repository.DonationRepository;
 import com.bloodbridge.repository.DonorProfileRepository;
 import com.bloodbridge.repository.HospitalRepository;
 import com.bloodbridge.repository.UserRepository;
+import com.bloodbridge.service.EmailService;
 import com.bloodbridge.service.impl.CertificateServiceImpl;
 import com.lowagie.text.pdf.PdfReader;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +66,7 @@ class CertificateEndToEndWorkflowIntegrationTest {
     private HospitalRepository hospitalRepository;
 
     @Autowired
-    private com.bloodbridge.repository.BloodRequestRepository bloodRequestRepository;
+    private BloodRequestRepository bloodRequestRepository;
 
     @Autowired
     private DonorDonationController donorDonationController;

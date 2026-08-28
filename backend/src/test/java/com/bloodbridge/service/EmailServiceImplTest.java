@@ -169,4 +169,69 @@ class EmailServiceImplTest {
         verify(mailSender, times(1)).createMimeMessage();
         verify(mailSender, times(1)).send(any(MimeMessage.class));
     }
+
+    @Test
+    void sendEmergencyAlert_WithResendProvider_UsesHttpApiTransportAndBypassesSmtp() {
+        HttpApiEmailTransportServiceImpl mockHttpTransport = mock(HttpApiEmailTransportServiceImpl.class);
+        when(mockHttpTransport.getProviderName()).thenReturn("RESEND_HTTPS_API");
+        
+        EmailServiceImpl resendEmailService = new EmailServiceImpl(smtpTransport, mockHttpTransport, emailNotificationRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(resendEmailService, "emailProvider", "resend");
+
+        EmergencyMailDto mailDto = EmergencyMailDto.builder()
+                .requestId(999L)
+                .donorId(888L)
+                .toEmail("donor@example.com")
+                .donorName("Resend Donor")
+                .hospitalName("City General")
+                .bloodGroup("A_POSITIVE")
+                .unitsRequired(1)
+                .urgencyLevel("HIGH")
+                .build();
+
+        resendEmailService.sendEmergencyAlert(mailDto);
+
+        // Verify HTTP API transport was invoked with HTML email
+        verify(mockHttpTransport, times(1)).sendHtmlEmail(eq("donor@example.com"), anyString(), anyString(), anyString(), isNull(), isNull());
+
+        // Verify JavaMailSender / SMTP was NEVER called
+        verify(mailSender, never()).createMimeMessage();
+        verify(mailSender, never()).send(any(MimeMessage.class));
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void sendDonationCertificateEmail_WithResendProvider_PassesPdfBytesToHttpTransport() {
+        HttpApiEmailTransportServiceImpl mockHttpTransport = mock(HttpApiEmailTransportServiceImpl.class);
+        when(mockHttpTransport.getProviderName()).thenReturn("RESEND_HTTPS_API");
+
+        EmailServiceImpl resendEmailService = new EmailServiceImpl(smtpTransport, mockHttpTransport, emailNotificationRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(resendEmailService, "emailProvider", "resend");
+
+        byte[] pdfBytes = "Sample Certificate".getBytes();
+        resendEmailService.sendDonationCertificateEmail(
+                "donor@example.com",
+                "Resend Donor",
+                "City General",
+                "A_POSITIVE",
+                1,
+                "2026-08-28",
+                "CERT-RESEND-001",
+                pdfBytes
+        );
+
+        // Verify HTTP API transport was called with attachment
+        verify(mockHttpTransport, times(1)).sendHtmlEmail(
+                eq("donor@example.com"),
+                eq("BloodBridge Donation Certificate"),
+                anyString(),
+                eq("BloodBridge Team"),
+                eq(pdfBytes),
+                eq("BloodBridge_Certificate_CERT-RESEND-001.pdf")
+        );
+
+        // Verify SMTP was NEVER called
+        verify(mailSender, never()).createMimeMessage();
+        verify(mailSender, never()).send(any(MimeMessage.class));
+    }
 }
