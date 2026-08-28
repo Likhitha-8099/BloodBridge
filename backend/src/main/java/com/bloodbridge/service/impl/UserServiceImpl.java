@@ -221,60 +221,46 @@ public class UserServiceImpl implements UserService {
 
         String email = user.getEmail();
 
-        try {
-            deviceTokenRepository.deleteAllByUser(user);
-        } catch (Exception ex) {
-            log.warn("Could not delete device tokens for user {}: {}", id, ex.getMessage());
-        }
+        // 1. Delete user-level communication/token child records
+        pushDeliveryLogRepository.deleteAllByUserId(id);
+        deviceTokenRepository.deleteAllByUser(user);
+        notificationPreferenceRepository.deleteAllByUserId(id);
+        notificationRepository.deleteAllByRecipientUserId(id);
 
-        try {
-            pushDeliveryLogRepository.deleteAllByUserId(id);
-        } catch (Exception ex) {
-            log.warn("Could not delete push delivery logs for user {}: {}", id, ex.getMessage());
-        }
-
-        try {
-            notificationPreferenceRepository.findByUserId(id).ifPresent(notificationPreferenceRepository::delete);
-        } catch (Exception ex) {
-            log.warn("Could not delete notification preferences for user {}: {}", id, ex.getMessage());
-        }
-
-        try {
-            notificationRepository.deleteAllByRecipientUserId(id);
-        } catch (Exception ex) {
-            log.warn("Could not delete recipient notifications for user {}: {}", id, ex.getMessage());
-        }
-
-        // Clean up Donor Profile if user was a donor
+        // 2. Clean up Donor Profile if user was a donor
         donorProfileRepository.findByUserId(id).ifPresent(dp -> {
             Long dpId = dp.getId();
-            try { notificationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlinkDonorProfile failed: {}", ex.getMessage()); }
-            try { auditLogRepository.unlinkDonor(dpId); } catch (Exception ex) { log.warn("unlink donor audit logs failed: {}", ex.getMessage()); }
-            try { donorLiveLocationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete donor live locations failed: {}", ex.getMessage()); }
-            try { matchedEmergencyDonorRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete matched emergency donors failed: {}", ex.getMessage()); }
-            try { emergencyResponseRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete emergency responses failed: {}", ex.getMessage()); }
-            try { matchResultRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete match results failed: {}", ex.getMessage()); }
-            try { emailNotificationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete email notifications failed: {}", ex.getMessage()); }
-            try { donationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlink donations failed: {}", ex.getMessage()); }
-            try { donorProfileRepository.delete(dp); } catch (Exception ex) { log.warn("delete donor profile failed: {}", ex.getMessage()); }
+            notificationRepository.unlinkDonorProfile(dpId);
+            donorLiveLocationRepository.deleteAllByDonorId(dpId);
+            matchedEmergencyDonorRepository.deleteAllByDonorId(dpId);
+            emergencyResponseRepository.deleteAllByDonorId(dpId);
+            emailNotificationRepository.deleteAllByDonorId(dpId);
+            donationRepository.unlinkDonorProfile(dpId);
+            matchResultRepository.deleteAllByDonorId(dpId);
+            auditLogRepository.unlinkDonor(dpId);
+
+            donorProfileRepository.delete(dp);
+            donorProfileRepository.flush();
         });
 
+        // 3. Clean up Hospital Profile if user was a hospital
         hospitalRepository.findByUserId(id).ifPresent(h -> {
-            try { notificationRepository.unlinkHospitalProfile(h.getId()); } catch (Exception ignored) {}
-            try { donationRepository.unlinkHospitalProfile(h.getId()); } catch (Exception ignored) {}
-            try { matchedEmergencyDonorRepository.deleteAllByHospitalId(h.getId()); } catch (Exception ignored) {}
-            try { hospitalRepository.delete(h); } catch (Exception ex) { log.warn("Could not delete hospital profile for user {}: {}", id, ex.getMessage()); }
+            notificationRepository.unlinkHospitalProfile(h.getId());
+            donationRepository.unlinkHospitalProfile(h.getId());
+            matchedEmergencyDonorRepository.deleteAllByHospitalId(h.getId());
+            auditLogRepository.unlinkHospital(h.getId());
+            hospitalRepository.delete(h);
+            hospitalRepository.flush();
         });
 
-        try {
-            patientProfileRepository.findByUserId(id).ifPresent(patientProfileRepository::delete);
-        } catch (Exception ex) {
-            log.warn("Could not delete patient profile for user {}: {}", id, ex.getMessage());
-        }
-
-        try { auditLogRepository.unlinkUser(id); } catch (Exception ex) { log.warn("unlink user audit logs failed: {}", ex.getMessage()); }
+        // 4. Clean up Patient Profile if user was a patient
+        patientProfileRepository.findByUserId(id).ifPresent(p -> {
+            patientProfileRepository.delete(p);
+            patientProfileRepository.flush();
+        });
 
         userRepository.delete(user);
+        userRepository.flush();
 
         auditLoggerService.logEvent("USER_DELETED", email, "User ID " + id + " permanently deleted");
         try {
@@ -290,7 +276,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public ApiResponse<String> deleteDonor(Long donorId) {
-        log.info("Permanently deleting donor with identifier ID: {}", donorId);
+        log.info("========== [START DONOR DELETION] identifier ID: {} ==========", donorId);
 
         com.bloodbridge.entity.DonorProfile donorProfile = donorProfileRepository.findById(donorId)
                 .or(() -> donorProfileRepository.findByUserId(donorId))
@@ -313,59 +299,74 @@ public class UserServiceImpl implements UserService {
         String userEmail = user != null ? user.getEmail() : (donorProfile != null ? donorProfile.getEmail() : "unknown");
         Long userId = user != null ? user.getId() : (donorProfile != null && donorProfile.getUser() != null ? donorProfile.getUser().getId() : null);
         Long dpId = donorProfile != null ? donorProfile.getId() : null;
+        User targetUser = user != null ? user : (userId != null ? userRepository.findById(userId).orElse(null) : null);
+        Long targetUid = targetUser != null ? targetUser.getId() : userId;
 
-        // 1. Cleanup all donor profile dependencies
-        if (dpId != null) {
-            log.info("Cleaning up donor profile ID: {}", dpId);
-            try { notificationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlinkDonorProfile error: {}", ex.getMessage()); }
-            try { auditLogRepository.unlinkDonor(dpId); } catch (Exception ex) { log.warn("unlink donor audit logs error: {}", ex.getMessage()); }
-            try { donorLiveLocationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete donor live locations error: {}", ex.getMessage()); }
-            try { matchedEmergencyDonorRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete matched emergency donors error: {}", ex.getMessage()); }
-            try { emergencyResponseRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete emergency responses error: {}", ex.getMessage()); }
-            try { emailNotificationRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete email notifications error: {}", ex.getMessage()); }
+        log.info("[DONOR DELETION] donor user ID = {}, donor profile ID = {}, email = {}", targetUid, dpId, userEmail);
 
-            try { donationRepository.unlinkDonorProfile(dpId); } catch (Exception ex) { log.warn("unlink donations error: {}", ex.getMessage()); }
-            try { matchResultRepository.deleteAllByDonorId(dpId); } catch (Exception ex) { log.warn("delete match results error: {}", ex.getMessage()); }
+        // 1. Cleanup all user child dependencies (Push logs, device tokens, notification prefs, recipient notifications)
+        if (targetUid != null) {
+            log.info("[DONOR DELETION] step = deleting push delivery logs (userId={})", targetUid);
+            pushDeliveryLogRepository.deleteAllByUserId(targetUid);
 
-            try {
-                donorProfileRepository.delete(donorProfile);
-                donorProfileRepository.flush();
-            } catch (Exception ex) {
-                log.error("Failed to delete donor profile entity: {}", ex.getMessage());
-                throw ex;
-            }
-        }
-
-        // 2. Cleanup user entity and user dependencies
-        if (user != null || userId != null) {
-            User targetUser = user != null ? user : userRepository.findById(userId).orElse(null);
             if (targetUser != null) {
-                Long targetUid = targetUser.getId();
-                log.info("Cleaning up user entity ID: {} ({})", targetUid, targetUser.getEmail());
-
-                try { pushDeliveryLogRepository.deleteAllByUserId(targetUid); } catch (Exception ex) { log.warn("delete push delivery logs error: {}", ex.getMessage()); }
-                try { deviceTokenRepository.deleteAllByUser(targetUser); } catch (Exception ex) { log.warn("delete device tokens error: {}", ex.getMessage()); }
-                try { notificationPreferenceRepository.findByUserId(targetUid).ifPresent(notificationPreferenceRepository::delete); } catch (Exception ex) { log.warn("delete notif prefs error: {}", ex.getMessage()); }
-                try { notificationRepository.deleteAllByRecipientUserId(targetUid); } catch (Exception ex) { log.warn("delete user notifications error: {}", ex.getMessage()); }
-                try { auditLogRepository.unlinkUser(targetUid); } catch (Exception ex) { log.warn("unlink user audit logs error: {}", ex.getMessage()); }
-
-                try {
-                    userRepository.delete(targetUser);
-                    userRepository.flush();
-                } catch (Exception ex) {
-                    log.error("Failed to delete user entity: {}", ex.getMessage());
-                    throw ex;
-                }
+                log.info("[DONOR DELETION] step = deleting device tokens (userId={})", targetUid);
+                deviceTokenRepository.deleteAllByUser(targetUser);
             }
+
+            log.info("[DONOR DELETION] step = deleting notification preferences (userId={})", targetUid);
+            notificationPreferenceRepository.deleteAllByUserId(targetUid);
+
+            log.info("[DONOR DELETION] step = deleting recipient notifications (userId={})", targetUid);
+            notificationRepository.deleteAllByRecipientUserId(targetUid);
         }
 
+        // 2. Cleanup all donor profile dependencies
+        if (dpId != null) {
+            log.info("[DONOR DELETION] step = unlinking donor references on hospital notifications (donorId={})", dpId);
+            notificationRepository.unlinkDonorProfile(dpId);
+
+            log.info("[DONOR DELETION] step = deleting donor live locations (donorId={})", dpId);
+            donorLiveLocationRepository.deleteAllByDonorId(dpId);
+
+            log.info("[DONOR DELETION] step = deleting matched emergency donors (donorId={})", dpId);
+            matchedEmergencyDonorRepository.deleteAllByDonorId(dpId);
+
+            log.info("[DONOR DELETION] step = deleting emergency responses (donorId={})", dpId);
+            emergencyResponseRepository.deleteAllByDonorId(dpId);
+
+            log.info("[DONOR DELETION] step = deleting email notifications (donorId={})", dpId);
+            emailNotificationRepository.deleteAllByDonorId(dpId);
+
+            log.info("[DONOR DELETION] step = unlinking donations (donorId={})", dpId);
+            donationRepository.unlinkDonorProfile(dpId);
+
+            log.info("[DONOR DELETION] step = deleting match results (donorId={})", dpId);
+            matchResultRepository.deleteAllByDonorId(dpId);
+
+            log.info("[DONOR DELETION] step = unlinking audit logs (donorId={})", dpId);
+            auditLogRepository.unlinkDonor(dpId);
+
+            log.info("[DONOR DELETION] step = deleting donor profile entity (donorId={})", dpId);
+            donorProfileRepository.delete(donorProfile);
+            donorProfileRepository.flush();
+        }
+
+        // 3. Delete target user entity (cascade removes element collection user_roles)
+        if (targetUser != null) {
+            log.info("[DONOR DELETION] step = deleting user and user_roles (userId={})", targetUid);
+            userRepository.delete(targetUser);
+            userRepository.flush();
+        }
+
+        log.info("[DONOR DELETION] step = logging audit event and broadcasting realtime update");
         auditLoggerService.logEvent("DONOR_DELETED", userEmail, "Donor ID " + donorId + " (" + userEmail + ") permanently deleted");
         try {
             realtimeService.publishAdminUsersUpdate(com.bloodbridge.dto.RealtimeEventDTO.builder().eventType(com.bloodbridge.enums.RealtimeEventType.USER_DELETED).message("Donor deleted").build());
             realtimeService.publishAdminDashboardUpdate(com.bloodbridge.dto.RealtimeEventDTO.builder().eventType(com.bloodbridge.enums.RealtimeEventType.USER_DELETED).message("Donor deleted").build());
         } catch (Exception ignored) {}
 
-        log.info("Successfully deleted donor ID: {} ({})", donorId, userEmail);
+        log.info("========== [SUCCESS DONOR DELETION] donor ID: {} ({}) ==========", donorId, userEmail);
         return ApiResponse.success("Donor permanently deleted successfully");
     }
 

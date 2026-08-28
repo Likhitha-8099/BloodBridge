@@ -37,6 +37,6 @@ public interface PushDeliveryLogRepository extends JpaRepository<PushDeliveryLog
     long countByCreatedAtAfter(LocalDateTime timestamp);
 
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("DELETE FROM PushDeliveryLog p WHERE (p.user IS NOT NULL AND p.user.id = :userId) OR (p.deviceToken IS NOT NULL AND p.deviceToken.user.id = :userId)")
+    @Query("DELETE FROM PushDeliveryLog p WHERE (p.user.id = :userId) OR (p.deviceToken.id IN (SELECT dt.id FROM DeviceToken dt WHERE dt.user.id = :userId))")
     void deleteAllByUserId(@Param("userId") Long userId);
 }

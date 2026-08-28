@@ -37,10 +37,10 @@ public class HttpApiEmailTransportServiceImpl implements EmailTransportService {
     @Value("${EMAIL_FROM:${RESEND_FROM_EMAIL:${app.email.from:BloodBridge <onboarding@resend.dev>}}}")
     private String resendFrom;
 
-    @Value("${BREVO_API_KEY:${app.email.brevo.api-key:}}}")
+    @Value("${BREVO_API_KEY:${app.email.brevo.api-key:}}")
     private String brevoApiKey;
 
-    @Value("${BREVO_FROM_EMAIL:${app.email.brevo.from:insureai2@gmail.com}}}")
+    @Value("${BREVO_FROM_EMAIL:${app.email.brevo.from:insureai2@gmail.com}}")
     private String brevoFrom;
 
     private String maskEmail(String email) {
@@ -92,6 +92,7 @@ public class HttpApiEmailTransportServiceImpl implements EmailTransportService {
         log.info("[EMAIL-API] Starting Resend HTTPS API dispatch | Recipient: {} | Subject: {}", maskedTo, subject);
 
         if (resendApiKey == null || resendApiKey.isBlank()) {
+            log.error("[EMAIL-API] Resend dispatch aborted: Missing RESEND_API_KEY environment variable | Recipient: {}", maskedTo);
             throw new IllegalStateException("Resend API Key is not configured. Set RESEND_API_KEY environment variable.");
         }
 
@@ -135,9 +136,9 @@ public class HttpApiEmailTransportServiceImpl implements EmailTransportService {
                 log.info("[EMAIL-API] Resend HTTPS API dispatch SUCCESS | Recipient: {} | Status: {} | Duration: {} ms",
                         maskedTo, response.statusCode(), latencyMs);
             } else {
-                log.error("[EMAIL-API] Resend HTTPS API dispatch FAILED | Recipient: {} | Status: {} | Response: {}",
-                        maskedTo, response.statusCode(), response.body());
-                throw new RuntimeException("Resend API returned status " + response.statusCode() + ": " + response.body());
+                log.error("[EMAIL-API] Resend HTTPS API dispatch FAILED | Provider: RESEND | Status: {} | Recipient: {} | Response: {}",
+                        response.statusCode(), maskedTo, response.body());
+                throw new RuntimeException("Resend API returned HTTP status " + response.statusCode() + ": " + response.body());
             }
         } catch (Exception e) {
             log.error("[EMAIL-API] Resend HTTPS API Exception: {} | Recipient: {}", e.getMessage(), maskedTo);
@@ -150,15 +151,29 @@ public class HttpApiEmailTransportServiceImpl implements EmailTransportService {
         log.info("[EMAIL-API] Starting Brevo HTTPS API dispatch | Recipient: {} | Subject: {}", maskedTo, subject);
 
         if (brevoApiKey == null || brevoApiKey.isBlank()) {
+            log.error("[EMAIL-API] Brevo dispatch aborted: Missing BREVO_API_KEY environment variable | Recipient: {}", maskedTo);
             throw new IllegalStateException("Brevo API Key is not configured. Set BREVO_API_KEY environment variable.");
         }
 
         try {
             Map<String, Object> payload = new HashMap<>();
             
+            String senderEmail = (brevoFrom != null && !brevoFrom.isBlank()) ? brevoFrom.trim() : "insureai2@gmail.com";
+            String senderDisplayName = (fromName != null && !fromName.isBlank()) ? fromName : "BloodBridge";
+
+            if (senderEmail.contains("<") && senderEmail.contains(">")) {
+                int start = senderEmail.indexOf('<');
+                int end = senderEmail.indexOf('>');
+                String extractedName = senderEmail.substring(0, start).trim().replace("\"", "");
+                if (!extractedName.isBlank()) {
+                    senderDisplayName = extractedName;
+                }
+                senderEmail = senderEmail.substring(start + 1, end).trim();
+            }
+
             Map<String, String> sender = new HashMap<>();
-            sender.put("name", fromName != null && !fromName.isBlank() ? fromName : "BloodBridge");
-            sender.put("email", (brevoFrom != null && !brevoFrom.isBlank()) ? brevoFrom.trim() : "insureai2@gmail.com");
+            sender.put("name", senderDisplayName);
+            sender.put("email", senderEmail);
             payload.put("sender", sender);
 
             payload.put("to", Collections.singletonList(Collections.singletonMap("email", to)));
@@ -195,9 +210,9 @@ public class HttpApiEmailTransportServiceImpl implements EmailTransportService {
                 log.info("[EMAIL-API] Brevo HTTPS API dispatch SUCCESS | Recipient: {} | Status: {} | Duration: {} ms",
                         maskedTo, response.statusCode(), latencyMs);
             } else {
-                log.error("[EMAIL-API] Brevo HTTPS API dispatch FAILED | Recipient: {} | Status: {} | Response: {}",
-                        maskedTo, response.statusCode(), response.body());
-                throw new RuntimeException("Brevo API returned status " + response.statusCode() + ": " + response.body());
+                log.error("[EMAIL-API] Brevo HTTPS API dispatch FAILED | Provider: BREVO | Status: {} | Recipient: {} | Response: {}",
+                        response.statusCode(), maskedTo, response.body());
+                throw new RuntimeException("Brevo API returned HTTP status " + response.statusCode() + ": " + response.body());
             }
         } catch (Exception e) {
             log.error("[EMAIL-API] Brevo HTTPS API Exception: {} | Recipient: {}", e.getMessage(), maskedTo);

@@ -13,7 +13,7 @@ import ErrorState from '../../components/ui/ErrorState';
 import EligibilityWidget from '../../components/donor/EligibilityWidget';
 import AchievementCard from '../../components/donor/AchievementCard';
 import { Link } from 'react-router-dom';
-import { Heart, Activity, Calendar, User, Award, MapPin, Clock, CheckCircle2, Wifi, WifiOff, Navigation, Check, X } from 'lucide-react';
+import { Heart, Activity, Calendar, User, Award, MapPin, Clock, CheckCircle2, Wifi, WifiOff, Check, X } from 'lucide-react';
 import api from '../../api/axios';
 
 /**
@@ -102,11 +102,7 @@ export default function DonorDashboard() {
     setIsResponding(true);
     try {
       const reqId = req.requestId || req.id;
-      const res = await api.post(`/donor/emergency-requests/${reqId}/accept`);
-      const mapsUrl = res.data?.data?.googleMapsUrl || res.data?.googleMapsUrl || req.googleMapsUrl;
-      if (mapsUrl) {
-        window.open(mapsUrl, '_blank');
-      }
+      await api.post(`/donor/emergency-requests/${reqId}/accept`);
       refetchProfile();
       if (refetchRequests) refetchRequests();
     } catch (err) {
@@ -129,23 +125,13 @@ export default function DonorDashboard() {
     }
   };
 
-  const handleNavigateCard = (req) => {
-    const lat = req.hospitalLatitude || 0;
-    const lng = req.hospitalLongitude || 0;
-    const mapsUrl = req.googleMapsUrl || `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    window.open(mapsUrl, '_blank');
-  };
 
   const handleAcceptEmergencyPopup = async () => {
     if (!activeEmergencyPopup) return;
     setIsResponding(true);
     try {
       const reqId = activeEmergencyPopup.emergencyRequestId || activeEmergencyPopup.requestId || activeEmergencyPopup.id;
-      const res = await api.post(`/donor/emergency-requests/${reqId}/accept`);
-      const mapsUrl = res.data?.data?.googleMapsUrl || res.data?.googleMapsUrl || activeEmergencyPopup.googleMapsUrl;
-      if (mapsUrl) {
-        window.open(mapsUrl, '_blank');
-      }
+      await api.post(`/donor/emergency-requests/${reqId}/accept`);
       setActiveEmergencyPopup(null);
       refetchProfile();
       if (refetchRequests) refetchRequests();
@@ -344,15 +330,6 @@ export default function DonorDashboard() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 sm:self-center">
-                      <button
-                        onClick={() => handleNavigateCard(req)}
-                        title="Navigate on Google Maps"
-                        className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center gap-1 text-xs font-bold"
-                      >
-                        <Navigation className="h-4 w-4 text-blue-500" />
-                        <span className="hidden md:inline">Navigate</span>
-                      </button>
-
                       {req.status === 'ACCEPTED' ? (
                         <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-extrabold flex items-center gap-1">
                           <Check className="h-4 w-4" /> Accepted

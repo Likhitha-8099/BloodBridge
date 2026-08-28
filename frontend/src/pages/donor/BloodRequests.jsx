@@ -93,11 +93,7 @@ export default function BloodRequests() {
       setActionLoading(true);
       setActionError(null);
       const reqId = selectedRequest.requestId || selectedRequest.id;
-      const res = await api.post(`/donor/emergency-requests/${reqId}/accept`);
-      const mapsUrl = res.data?.data?.googleMapsUrl || res.data?.googleMapsUrl || selectedRequest.googleMapsUrl;
-      if (mapsUrl) {
-        window.open(mapsUrl, '_blank');
-      }
+      await api.post(`/donor/emergency-requests/${reqId}/accept`);
       setResponseSuccess(true);
       refetch();
       setTimeout(() => {
@@ -231,14 +227,10 @@ export default function BloodRequests() {
 
                 <div className="flex gap-2">
                   {isConfirmed || isAccepted || isInProgress || isCompleted ? (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => req.googleMapsUrl && window.open(req.googleMapsUrl, '_blank')}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm"
-                    >
-                      📍 Navigate to Hospital
-                    </Button>
+                    <div className="w-full py-2.5 px-4 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>{isCompleted ? 'Donation Completed' : isConfirmed ? 'Selected by Hospital' : 'Request Accepted'}</span>
+                    </div>
                   ) : (
                     <>
                       <Button variant="primary" size="sm" onClick={() => handleDonateClick(req)} className="flex-1 py-2.5 shadow-sm">

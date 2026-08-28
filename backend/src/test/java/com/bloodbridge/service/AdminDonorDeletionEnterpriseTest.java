@@ -88,6 +88,9 @@ class AdminDonorDeletionEnterpriseTest {
     private DonationRepository donationRepository;
 
     @Mock
+    private AuditLogRepository auditLogRepository;
+
+    @Mock
     private RealtimeService realtimeService;
 
     @Mock
@@ -219,6 +222,7 @@ class AdminDonorDeletionEnterpriseTest {
 
         // Verify unlinking donations rather than deleting hospital history
         verify(donationRepository, times(1)).unlinkDonorProfile(202L);
+        verify(auditLogRepository, times(1)).unlinkDonor(202L);
 
         // Verify child cleanups
         verify(notificationRepository, times(1)).unlinkDonorProfile(202L);
@@ -252,6 +256,7 @@ class AdminDonorDeletionEnterpriseTest {
         assertNotNull(response);
         assertTrue(response.isSuccess());
         verify(donationRepository, times(1)).unlinkDonorProfile(202L);
+        verify(auditLogRepository, times(1)).unlinkDonor(202L);
         verify(donorProfileRepository, times(1)).delete(sampleDonor);
         verify(userRepository, times(1)).delete(sampleUser);
     }

@@ -124,6 +124,8 @@ public class User {
     private void ensureRoleInRoles() {
         if (roles == null) {
             roles = new java.util.HashSet<>();
+        } else if (!(roles instanceof java.util.HashSet)) {
+            roles = new java.util.HashSet<>(roles);
         }
         if (role != null) {
             roles.add(role);

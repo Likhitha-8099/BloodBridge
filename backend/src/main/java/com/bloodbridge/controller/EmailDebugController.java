@@ -1,18 +1,14 @@
 package com.bloodbridge.controller;
 
-import com.bloodbridge.dto.EmergencyMailDto;
-import com.bloodbridge.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.PostConstruct;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.PrintWriter;
@@ -33,7 +29,8 @@ import java.util.Map;
 public class EmailDebugController {
 
     private final JavaMailSender mailSender;
-    private final EmailService emailService;
+    private final com.bloodbridge.service.impl.HttpApiEmailTransportServiceImpl httpApiTransport;
+    private final com.bloodbridge.service.impl.SmtpEmailTransportServiceImpl smtpTransport;
 
     @Value("${SPRING_MAIL_HOST:${MAIL_HOST:${spring.mail.host:smtp.gmail.com}}}")
     private String mailHost;
@@ -47,6 +44,21 @@ public class EmailDebugController {
     @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:${spring.mail.password:}}}")
     private String mailPassword;
 
+    @Value("${EMAIL_PROVIDER:${app.email.provider:smtp}}")
+    private String emailProvider;
+
+    @Value("${RESEND_API_KEY:${EMAIL_API_KEY:${app.email.resend.api-key:}}}")
+    private String resendApiKey;
+
+    @Value("${EMAIL_FROM:${RESEND_FROM_EMAIL:${app.email.from:BloodBridge <onboarding@resend.dev>}}}")
+    private String resendFrom;
+
+    @Value("${BREVO_API_KEY:${app.email.brevo.api-key:}}")
+    private String brevoApiKey;
+
+    @Value("${BREVO_FROM_EMAIL:${app.email.brevo.from:insureai2@gmail.com}}")
+    private String brevoFrom;
+
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
@@ -54,13 +66,36 @@ public class EmailDebugController {
     public void init() {
         String sanitizedPassword = mailPassword != null ? mailPassword.trim().replace(" ", "") : "";
         boolean pwdSet = !sanitizedPassword.isEmpty() && !"your-gmail-app-password-here".equals(sanitizedPassword);
+        boolean resendSet = resendApiKey != null && !resendApiKey.isBlank();
+        boolean brevoSet = brevoApiKey != null && !brevoApiKey.isBlank();
+
         log.info("================================================================================");
         log.info("✅ EmailDebugController Loaded Successfully:");
+        log.info(" - EMAIL_PROVIDER      : {}", emailProvider);
+        log.info(" - Active Transport    : {}", getActiveTransport().getProviderName());
+        log.info(" - RESEND Configured   : {}", resendSet);
+        log.info(" - BREVO Configured    : {}", brevoSet);
+        log.info(" - SMTP Configured     : {}", pwdSet);
         log.info(" - MAIL_HOST           : {}", mailHost);
         log.info(" - MAIL_PORT           : {}", mailPort);
-        log.info(" - MAIL_USERNAME       : {}", mailUsername);
-        log.info(" - Password configured : {}", pwdSet);
+        log.info(" - MAIL_USERNAME       : {}", maskEmail(mailUsername));
         log.info("================================================================================");
+    }
+
+    private com.bloodbridge.service.EmailTransportService getActiveTransport() {
+        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider)) {
+            return httpApiTransport;
+        }
+        if ("smtp".equalsIgnoreCase(emailProvider)) {
+            return smtpTransport;
+        }
+        if (smtpTransport.isConfigured()) {
+            return smtpTransport;
+        }
+        if (httpApiTransport.isConfigured()) {
+            return httpApiTransport;
+        }
+        return smtpTransport;
     }
 
     private String maskEmail(String email) {
@@ -108,13 +143,8 @@ public class EmailDebugController {
         return ResponseEntity.ok(report);
     }
 
-    private final com.bloodbridge.service.impl.HttpApiEmailTransportServiceImpl httpApiTransport;
-
-    @Value("${EMAIL_PROVIDER:${app.email.provider:smtp}}")
-    private String emailProvider;
-
     @Operation(summary = "Check SMTP and HTTPS Email Configuration", description = "Returns Email transport configuration, JavaMailSender status, API status, and template availability.")
-    @GetMapping("/smtp-status")
+    @GetMapping({"/smtp-status", "/email-status"})
     public ResponseEntity<Map<String, Object>> getSmtpStatus() {
         Map<String, Object> status = new HashMap<>();
         String sanitizedPassword = mailPassword != null ? mailPassword.trim().replace(" ", "") : "";
@@ -122,22 +152,18 @@ public class EmailDebugController {
         boolean isPasswordEmpty = sanitizedPassword.isEmpty();
         boolean isPasswordValid = !isPasswordEmpty && !isPasswordDefault;
 
-        String activeTransportName;
-        if ("resend".equalsIgnoreCase(emailProvider) || "brevo".equalsIgnoreCase(emailProvider) || "api".equalsIgnoreCase(emailProvider)) {
-            activeTransportName = httpApiTransport.getProviderName();
-        } else if ("smtp".equalsIgnoreCase(emailProvider)) {
-            activeTransportName = "GMAIL_SMTP";
-        } else if (isPasswordValid) {
-            activeTransportName = "GMAIL_SMTP";
-        } else if (httpApiTransport.isConfigured()) {
-            activeTransportName = httpApiTransport.getProviderName();
-        } else {
-            activeTransportName = "GMAIL_SMTP";
-        }
+        com.bloodbridge.service.EmailTransportService activeTransport = getActiveTransport();
+        boolean isResendConfigured = resendApiKey != null && !resendApiKey.isBlank();
+        boolean isBrevoConfigured = brevoApiKey != null && !brevoApiKey.isBlank();
 
         status.put("emailProvider", emailProvider);
-        status.put("activeTransport", activeTransportName);
+        status.put("activeTransport", activeTransport.getProviderName());
+        status.put("isTransportConfigured", activeTransport.isConfigured());
         status.put("isHttpApiConfigured", httpApiTransport.isConfigured());
+        status.put("isResendConfigured", isResendConfigured);
+        status.put("isBrevoConfigured", isBrevoConfigured);
+        status.put("resendFrom", resendFrom);
+        status.put("brevoFrom", brevoFrom);
         status.put("mailHost", mailHost);
         status.put("mailPort", mailPort);
         status.put("mailUsername", maskEmail(mailUsername));
@@ -156,7 +182,7 @@ public class EmailDebugController {
         return ResponseEntity.ok(status);
     }
 
-    @Operation(summary = "Send Test Emergency Email", description = "Triggers a test emergency HTML email dispatch via SMTP to verify the pipeline.")
+    @Operation(summary = "Send Test Emergency Email", description = "Triggers a test emergency HTML email dispatch via the active configured email transport to verify the pipeline.")
     @RequestMapping(value = "/test-email", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> sendTestEmail(
             @RequestParam(required = false) String to,
@@ -166,31 +192,37 @@ public class EmailDebugController {
                 ? body.get("to")
                 : to;
 
-        // Security: Default and restrict to configured sender or authorized developer account
-        String recipientEmail = (candidate != null && !candidate.isBlank()) ? candidate.trim() : mailUsername;
+        com.bloodbridge.service.EmailTransportService activeTransport = getActiveTransport();
+
+        // Default recipient resolution
+        String recipientEmail = (candidate != null && !candidate.isBlank())
+                ? candidate.trim()
+                : (mailUsername != null && !mailUsername.isBlank() ? mailUsername : "test@bloodbridge.com");
         String maskedRecipient = maskEmail(recipientEmail);
 
         log.info("================================================================================");
-        log.info("Stage 1: Controller invoked for test email dispatch. Recipient: {}", maskedRecipient);
+        log.info("[DEBUG-ENDPOINT] Test email dispatch initiated | Active Transport: {} | Recipient: {}",
+                activeTransport.getProviderName(), maskedRecipient);
 
         Map<String, Object> report = new HashMap<>();
         report.put("recipient", maskedRecipient);
-        report.put("sender", maskEmail(mailUsername));
-        report.put("mailHost", mailHost);
-        report.put("mailPort", mailPort);
+        report.put("emailProvider", emailProvider);
+        report.put("activeTransport", activeTransport.getProviderName());
+        report.put("isConfigured", activeTransport.isConfigured());
 
-        boolean isPasswordDefault = "your-gmail-app-password-here".equals(mailPassword);
-        boolean isPasswordEmpty = mailPassword == null || mailPassword.isBlank();
-        boolean isPasswordValid = !isPasswordEmpty && !isPasswordDefault;
-
-        report.put("isPasswordConfigured", isPasswordValid);
-        if (!isPasswordValid) {
+        if (!activeTransport.isConfigured()) {
             report.put("status", "FAILED_CONFIGURATION");
-            report.put("error", isPasswordDefault ?
-                    "MAIL_PASSWORD is still set to placeholder 'your-gmail-app-password-here'. Update spring.mail.password or set MAIL_PASSWORD environment variable with a valid Gmail App Password." :
-                    "MAIL_PASSWORD is empty.");
-            report.put("fixInstruction", "1. Enable 2-Step Verification on Gmail account. 2. Generate a 16-character App Password at https://myaccount.google.com/apppasswords. 3. Set MAIL_PASSWORD environment variable.");
-            log.error("[DEBUG-ENDPOINT] Configuration Check Failed: Invalid/default MAIL_PASSWORD.");
+            if ("resend".equalsIgnoreCase(emailProvider) || activeTransport.getProviderName().contains("RESEND")) {
+                report.put("error", "RESEND_API_KEY environment variable is not configured.");
+                report.put("fixInstruction", "Configure RESEND_API_KEY in your cloud deployment settings (e.g. Render). Also ensure EMAIL_PROVIDER=resend.");
+            } else if ("brevo".equalsIgnoreCase(emailProvider) || activeTransport.getProviderName().contains("BREVO")) {
+                report.put("error", "BREVO_API_KEY environment variable is not configured.");
+                report.put("fixInstruction", "Configure BREVO_API_KEY in your cloud deployment settings. Also ensure EMAIL_PROVIDER=brevo.");
+            } else {
+                report.put("error", "SMTP credentials not configured or blocked in cloud environment.");
+                report.put("fixInstruction", "In cloud environments, standard SMTP (ports 587/465) is blocked by cloud firewalls. Set EMAIL_PROVIDER=resend and configure RESEND_API_KEY.");
+            }
+            log.error("[DEBUG-ENDPOINT] Configuration Check Failed for Transport: {}", activeTransport.getProviderName());
             return ResponseEntity.badRequest().body(report);
         }
 
@@ -199,7 +231,7 @@ public class EmailDebugController {
         try {
             ClassPathResource resource = new ClassPathResource("templates/emergency-alert.html");
             if (!resource.exists()) {
-                log.error("Stage 2 Failed: Classpath resource 'templates/emergency-alert.html' does not exist.");
+                log.error("[DEBUG-ENDPOINT] Classpath resource 'templates/emergency-alert.html' does not exist.");
                 report.put("status", "FAILED_TEMPLATE");
                 report.put("error", "Classpath resource 'templates/emergency-alert.html' does not exist.");
                 return ResponseEntity.internalServerError().body(report);
@@ -211,78 +243,45 @@ public class EmailDebugController {
                     .replace("{bloodGroup}", "A+")
                     .replace("{unitsRequired}", "2")
                     .replace("{urgencyLevel}", "EMERGENCY")
-                    .replace("{location}", "Test City, Test State")
+                    .replace("{location}", "Diagnostic Test Location")
                     .replace("{hospitalAddress}", "123 Healthcare Ave")
                     .replace("{requiredByDate}", "Immediate")
-                    .replace("{reason}", "SMTP Diagnostic Verification")
+                    .replace("{reason}", "Email Diagnostic Verification")
                     .replace("{loginUrl}", frontendUrl + "/login");
             report.put("templateLoaded", true);
-            log.info("Stage 2: Template loaded successfully ({} chars)", htmlBody.length());
         } catch (Exception e) {
-            log.error("Stage 2 Exception: Failed to load emergency HTML template", e);
+            log.error("[DEBUG-ENDPOINT] Failed to load emergency HTML template", e);
             report.put("status", "FAILED_TEMPLATE_READ");
             report.put("error", e.getMessage());
             return ResponseEntity.internalServerError().body(report);
         }
 
-        // Stage 3 & 4: MimeMessage Creation & SMTP Dispatch
+        // Stage 3: Dispatch via active transport
         try {
-            String safeSender = (mailUsername != null && !mailUsername.isBlank())
-                    ? mailUsername
-                    : (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl
-                        ? ((org.springframework.mail.javamail.JavaMailSenderImpl) mailSender).getUsername()
-                        : "noreply@bloodbridge.com");
+            long t0 = System.currentTimeMillis();
+            String subject = "🚨 [TEST] BloodBridge Emergency Alert Pipeline Verification";
+            activeTransport.sendHtmlEmail(recipientEmail, subject, htmlBody, "BloodBridge Team", null, null);
+            long latencyMs = System.currentTimeMillis() - t0;
 
-            String safeRecipient = (recipientEmail != null && !recipientEmail.isBlank()) ? recipientEmail : safeSender;
-
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(safeRecipient);
-            helper.setSubject("🚨 [TEST] BloodBridge Emergency Alert Pipeline Verification");
-            helper.setFrom(safeSender, "BloodBridge System");
-            helper.setText(htmlBody, true);
-            log.info("Stage 3: MimeMessage created successfully with sender: {}", safeSender);
-
-            log.info("Stage 4: Connecting & Authenticating with SMTP server {}:{}...", mailHost, mailPort);
-            mailSender.send(message);
-
-            log.info("Stage 5: Email sent successfully via SMTP to {}", safeRecipient);
+            log.info("[DEBUG-ENDPOINT] Test email sent successfully via {} to {} ({} ms)",
+                    activeTransport.getProviderName(), maskedRecipient, latencyMs);
             log.info("================================================================================");
-            report.put("status", "SUCCESS");
-            report.put("message", "Test emergency HTML email was successfully sent via SMTP to " + safeRecipient);
 
-            // Also trigger async service method to ensure async path functions
-            EmergencyMailDto mailDto = EmergencyMailDto.builder()
-                    .toEmail(safeRecipient)
-                    .donorName("Test Donor (Async)")
-                    .hospitalName("BloodBridge Test Hospital")
-                    .bloodGroup("A_POSITIVE")
-                    .unitsRequired(2)
-                    .urgencyLevel("EMERGENCY")
-                    .city("Test City")
-                    .state("Test State")
-                    .requiredByDate("Immediate")
-                    .reason("Async Pipeline Test")
-                    .loginUrl(frontendUrl + "/login")
-                    .build();
-            emailService.sendEmergencyAlert(mailDto);
+            report.put("status", "SUCCESS");
+            report.put("message", "Test email was successfully sent via " + activeTransport.getProviderName() + " to " + maskedRecipient);
+            report.put("latencyMs", latencyMs);
 
             return ResponseEntity.ok(report);
         } catch (Exception e) {
-            log.error("[DEBUG-ENDPOINT] SMTP Transmission Failure: {}", e.getMessage(), e);
+            log.error("[DEBUG-ENDPOINT] Email Transmission Failure via {}: {}", activeTransport.getProviderName(), e.getMessage(), e);
 
             StringWriter sw = new StringWriter();
             e.printStackTrace(new PrintWriter(sw));
 
-            report.put("status", "FAILED_SMTP_TRANSMISSION");
+            report.put("status", "FAILED_EMAIL_TRANSMISSION");
             report.put("error", e.getMessage());
             report.put("exceptionType", e.getClass().getName());
             report.put("stackTrace", sw.toString());
-
-            if (e.getMessage() != null && e.getMessage().contains("535")) {
-                report.put("fixInstruction", "SMTP 535 Error: Gmail rejected login credentials. Check if your 16-character App Password has spaces or if 2-Factor Authentication is enabled on " + mailUsername);
-            }
 
             return ResponseEntity.internalServerError().body(report);
         }

@@ -25,10 +25,10 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     }
 
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
-    @org.springframework.data.jpa.repository.Query(value = "UPDATE audit_logs SET user_id = NULL WHERE user_id = :userId", nativeQuery = true)
-    void unlinkUser(@org.springframework.data.repository.query.Param("userId") Long userId);
+    @org.springframework.data.jpa.repository.Query("UPDATE AuditLog a SET a.donorId = NULL WHERE a.donorId = :donorId")
+    void unlinkDonor(@org.springframework.data.repository.query.Param("donorId") Long donorId);
 
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
-    @org.springframework.data.jpa.repository.Query(value = "UPDATE audit_logs SET donor_id = NULL WHERE donor_id = :donorId", nativeQuery = true)
-    void unlinkDonor(@org.springframework.data.repository.query.Param("donorId") Long donorId);
+    @org.springframework.data.jpa.repository.Query("UPDATE AuditLog a SET a.hospitalId = NULL WHERE a.hospitalId = :hospitalId")
+    void unlinkHospital(@org.springframework.data.repository.query.Param("hospitalId") Long hospitalId);
 }
